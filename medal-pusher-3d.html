@@ -1,0 +1,1015 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="theme-color" content="#2b1510">
+<title>メダルラッシュ・ローグライク 3D</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; user-select:none; -webkit-user-select:none; -webkit-touch-callout:none; -webkit-tap-highlight-color:transparent; }
+  html,body { height:100%; height:100dvh; background:#2b1510; color:#4a2c1a; font-family:"Hiragino Kaku Gothic ProN","Yu Gothic UI","Meiryo",sans-serif; overflow:hidden; overscroll-behavior:none; touch-action:manipulation; }
+  #app { display:flex; height:100%; align-items:stretch; justify-content:center; gap:12px; padding:8px; padding-top:max(8px,env(safe-area-inset-top)); padding-bottom:max(8px,env(safe-area-inset-bottom)); padding-left:max(8px,env(safe-area-inset-left)); padding-right:max(8px,env(safe-area-inset-right)); }
+  #stage { position:relative; flex:0 0 auto; align-self:center; width:660px; height:740px; max-width:calc(100vw - 300px); }
+  #gl { width:100%; height:100%; border-radius:16px; box-shadow:0 10px 50px rgba(0,0,0,.7); cursor:crosshair; touch-action:none; display:block; }
+  #floats { position:absolute; inset:0; pointer-events:none; overflow:hidden; }
+  .float { position:absolute; font-weight:bold; font-size:16px; text-shadow:0 2px 4px rgba(0,0,0,.7); transform:translate(-50%,-50%); white-space:nowrap; }
+  #comboBox { position:absolute; top:16%; left:50%; transform:translateX(-50%); text-align:center; pointer-events:none; display:none; }
+  #comboBox .c1 { font-size:30px; font-weight:900; color:#ffb347; -webkit-text-stroke:1.5px #6b2c12; text-shadow:0 3px 8px rgba(0,0,0,.6); }
+  #comboBox .c2 { font-size:16px; font-weight:bold; color:#ffe08a; text-shadow:0 2px 4px rgba(0,0,0,.7); }
+  #warnBox { position:absolute; top:42%; left:50%; transform:translateX(-50%); font-size:22px; font-weight:900; color:#ff5a5a; text-shadow:0 2px 6px rgba(0,0,0,.8); pointer-events:none; display:none; }
+  #side { width:260px; align-self:center; display:flex; flex-direction:column; gap:10px; }
+  .panel { background:#fff3dd; border:3px solid #b3592b; border-radius:14px; padding:12px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
+  .stat { display:flex; justify-content:space-between; align-items:baseline; margin:3px 0; font-size:14px; }
+  .stat b { font-size:20px; color:#c0392b; font-variant-numeric:tabular-nums; }
+  .stat .sub { color:#8a5a3a; }
+  #progWrap { height:12px; background:#e8d3b5; border-radius:6px; overflow:hidden; margin-top:6px; border:1px solid #b3592b; }
+  #prog { height:100%; width:0%; background:linear-gradient(90deg,#f39c12,#e74c3c); transition:width .2s; }
+  #coinBtns { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .cbtn { position:relative; display:flex; align-items:center; gap:8px; padding:7px 8px; min-height:44px; background:#ffe9c7; border:2px solid #d8a468; border-radius:10px; cursor:pointer; font-size:13px; color:#5a341c; text-align:left; touch-action:manipulation; }
+  @media (hover:hover) and (pointer:fine){ .cbtn:hover { background:#ffdda6; } }
+  .cbtn.sel { border-color:#c0392b; background:#ffd28a; box-shadow:0 0 0 2px rgba(192,57,43,.35); }
+  .cbtn.empty { opacity:.35; cursor:not-allowed; }
+  .cbtn .ic { width:22px; height:22px; border-radius:50%; flex:0 0 22px; box-shadow:inset 0 -3px 5px rgba(0,0,0,.3), inset 0 2px 3px rgba(255,255,255,.6); }
+  .cbtn .num { position:absolute; right:6px; bottom:4px; font-size:11px; color:#c0392b; font-weight:bold; }
+  .hint { font-size:11.5px; color:#7a4a28; line-height:1.7; }
+  .overlay { position:absolute; inset:0; background:rgba(40,15,8,.8); display:flex; align-items:center; justify-content:center; border-radius:16px; backdrop-filter:blur(3px); z-index:10; }
+  .modal { width:88%; max-height:92%; overflow:auto; background:#fff3dd; border:4px solid #b3592b; border-radius:18px; padding:22px; text-align:center; box-shadow:0 12px 60px rgba(0,0,0,.8); }
+  .modal h1 { font-size:28px; color:#c0392b; margin-bottom:6px; letter-spacing:2px; }
+  .modal h2 { font-size:22px; color:#c0392b; margin-bottom:10px; }
+  .modal p { font-size:13px; color:#6b4226; line-height:1.9; }
+  .bigbtn { margin-top:16px; padding:14px 36px; min-height:48px; font-size:17px; font-weight:bold; color:#fff; background:linear-gradient(180deg,#e74c3c,#c0392b); border:3px solid #8e2a1c; border-radius:32px; cursor:pointer; box-shadow:0 5px 16px rgba(192,57,43,.5); touch-action:manipulation; }
+  @media (hover:hover) and (pointer:fine){ .bigbtn:hover { filter:brightness(1.1); } }
+  .shopGrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0 4px; }
+  .shopItem { background:#ffe9c7; border:2px solid #d8a468; border-radius:12px; padding:10px; text-align:left; }
+  .shopItem .nm { font-size:14px; font-weight:bold; color:#5a341c; }
+  .shopItem .ds { font-size:11.5px; color:#8a5a3a; margin:4px 0 8px; line-height:1.5; min-height:34px; }
+  .shopItem button { width:100%; padding:8px 6px; min-height:40px; border:2px solid #8e2a1c; border-radius:8px; font-weight:bold; cursor:pointer; background:#e74c3c; color:#fff; font-size:13px; touch-action:manipulation; }
+  .shopItem button:disabled { background:#c9b393; border-color:#a08560; color:#efe3cd; cursor:not-allowed; }
+  .shopItem.sold { opacity:.45; }
+  .tkt { color:#1d8fb0; font-weight:bold; }
+  #muteBtn { position:absolute; top:max(10px,env(safe-area-inset-top)); right:max(10px,env(safe-area-inset-right)); z-index:12; width:40px; height:40px; border-radius:50%; border:2px solid #b3592b; background:rgba(255,243,221,.9); color:#5a341c; cursor:pointer; font-size:16px; touch-action:manipulation; }
+
+  /* ==== スマホ・タブレット向けレイアウト（縦画面：筐体を上、パネルを下にスタック） ==== */
+  @media (max-width:960px){
+    #app{ flex-direction:column; align-items:center; justify-content:flex-start; overflow-y:auto; overflow-x:hidden; gap:8px; }
+    #stage{ width:100%; max-width:640px; flex:0 0 auto; height:auto; aspect-ratio:660/700; }
+    #side{ width:min(640px,100%); flex:0 0 auto; }
+    .panel{ padding:10px; }
+    .modal{ padding:16px; }
+    .modal h1{ font-size:22px; }
+    .modal p{ font-size:12.5px; line-height:1.7; }
+  }
+  /* ==== 横画面のスマホ（高さが低い）：デスクトップ同様の横並びをコンパクトに ==== */
+  @media (max-width:960px) and (orientation:landscape) and (max-height:560px){
+    #app{ flex-direction:row; align-items:stretch; overflow:hidden; }
+    #stage{ width:auto; max-width:66vw; height:100%; aspect-ratio:auto; flex:1 1 auto; min-height:0; }
+    #side{ width:210px; height:100%; overflow-y:auto; flex:0 0 auto; }
+    .hint{ display:none; }
+  }
+  /* ==== 極小画面向け微調整 ==== */
+  @media (max-width:380px){
+    .modal h1{ font-size:19px; }
+    .modal p{ font-size:11.5px; }
+    .bigbtn{ padding:12px 24px; font-size:15px; }
+    .cbtn{ font-size:12px; }
+  }
+</style>
+</head>
+<body>
+<div id="app">
+  <div id="stage">
+    <canvas id="gl"></canvas>
+    <div id="floats"></div>
+    <div id="comboBox"><div class="c1"></div><div class="c2"></div></div>
+    <div id="warnBox"></div>
+    <button id="muteBtn" title="サウンド切替">🔊</button>
+    <div class="overlay" id="titleOv">
+      <div class="modal">
+        <h1>🎪 メダルラッシュ<br>ローグライク 3D</h1>
+        <p style="margin-top:10px">クリック / タップでたぬきコインを投入！<br>
+        プッシャーでコインを押し出し、<b style="color:#27ae60">スコアゾーン</b>に落とそう。<br><br>
+        短時間に連続で落とすと <b style="color:#e67e22">コンボ</b> 発生で倍率アップ！<br>
+        目標スコアを達成するとラウンドクリア。<br>
+        獲得した<span class="tkt">チケット</span>でショップの特殊コインや強化を買って、<br>
+        どこまでラウンドを進められるか挑戦だ。<br><br>
+        <span style="color:#a06a40;font-size:12px">キー 1〜7 でコイン切替 ／ 長押しで連続投入</span></p>
+        <button class="bigbtn" id="startBtn">ゲームスタート</button>
+      </div>
+    </div>
+    <div class="overlay" id="shopOv" style="display:none">
+      <div class="modal">
+        <h2 id="shopTitle">ラウンドクリア！</h2>
+        <p>所持チケット：<span class="tkt" id="shopTkt">0</span> 🎫</p>
+        <div class="shopGrid" id="shopGrid"></div>
+        <button class="bigbtn" id="nextBtn">次のラウンドへ ▶</button>
+      </div>
+    </div>
+    <div class="overlay" id="overOv" style="display:none">
+      <div class="modal">
+        <h2>ゲームオーバー…</h2>
+        <p id="overText"></p>
+        <button class="bigbtn" id="retryBtn">もう一度挑戦</button>
+      </div>
+    </div>
+  </div>
+  <div id="side">
+    <div class="panel">
+      <div class="stat"><span class="sub">ラウンド</span><b id="uiRound">1</b></div>
+      <div class="stat"><span class="sub">スコア / 目標</span><b><span id="uiScore">0</span><span style="font-size:13px;color:#8a5a3a"> / <span id="uiTarget">100</span></span></b></div>
+      <div id="progWrap"><div id="prog"></div></div>
+      <div class="stat" style="margin-top:8px"><span class="sub">チケット</span><b style="color:#1d8fb0" id="uiTkt">0</b></div>
+      <div class="stat"><span class="sub">残りコイン</span><b id="uiStock">30</b></div>
+    </div>
+    <div class="panel">
+      <div style="font-size:12px;color:#8a5a3a;margin-bottom:8px">投入コイン選択</div>
+      <div id="coinBtns"></div>
+    </div>
+    <div class="panel hint">
+      💡 <b>スコアゾーン</b>（緑）に落とすと得点＋チケット。中央の <b style="color:#e67e22">×3</b> はボーナス！ 端の赤いゾーンはロスト。<br>
+      💣 ボムは着地後に爆発して周囲を吹き飛ばす。🐰 ウサギは自分で跳ねて前進、🧲 マグネットは周囲を引き寄せる。
+    </div>
+  </div>
+</div>
+<script type="importmap">
+{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+</script>
+<script type="module">
+import * as THREE from 'three';
+"use strict";
+
+/* ================= シミュレーション定数（2D版と同一の検証済みロジック） ================= */
+const WALL_L=40, WALL_R=440;
+const BACK=26;
+const PUSH_MIN=140, PUSH_MAX=238;
+const FRONT=556;
+const DROP_Y=92;
+const CX=(WALL_L+WALL_R)/2;
+
+const TYPES={
+  normal:{name:"たぬき",   r:13, mass:1,   value:10, ticket:1, col:"#f2a65e", col2:"#b56a2a", key:"1", desc:"基本のたぬきコイン"},
+  gold:  {name:"ゴールド", r:13, mass:1,   value:50, ticket:3, col:"#ffd94d", col2:"#c99a1e", key:"2", desc:"スコア5倍＆チケット3枚"},
+  bomb:  {name:"ボム",     r:14, mass:1.2, value:15, ticket:1, col:"#6b6478", col2:"#3a3444", key:"3", desc:"着地4秒後に爆発し周囲を押し飛ばす"},
+  rabbit:{name:"ウサギ",   r:12, mass:0.9, value:15, ticket:1, col:"#ffc6dc", col2:"#d987a8", key:"4", desc:"自分でぴょんぴょん前進する"},
+  magnet:{name:"マグネット",r:14, mass:1.3, value:15, ticket:1, col:"#8fa8ff", col2:"#4a5fd0", key:"5", desc:"周囲のコインを引き寄せて団体行動"},
+  big:   {name:"ビッグ",   r:20, mass:3,   value:30, ticket:2, col:"#ff9d4d", col2:"#b35c1a", key:"6", desc:"大きく重い。押し出し力バツグン"},
+  split: {name:"スプリット",r:13, mass:1,  value:10, ticket:1, col:"#a8f0c0", col2:"#5cb87e", key:"7", desc:"台に降りると3枚のコインに分裂"},
+};
+const ORDER=["normal","gold","bomb","rabbit","magnet","big","split"];
+
+/* ================= サウンド ================= */
+let ac=null, muted=false;
+function ensureAC(){ if(!ac){ try{ ac=new (window.AudioContext||window.webkitAudioContext)(); }catch(e){} } if(ac&&ac.state==="suspended") ac.resume(); }
+function beep(f,dur,type="sine",vol=0.15,slide=0){
+  if(muted||!ac) return;
+  const o=ac.createOscillator(), g=ac.createGain(), t=ac.currentTime;
+  o.type=type; o.frequency.setValueAtTime(f,t);
+  if(slide) o.frequency.exponentialRampToValueAtTime(Math.max(30,f+slide),t+dur);
+  g.gain.setValueAtTime(vol,t); g.gain.exponentialRampToValueAtTime(0.001,t+dur);
+  o.connect(g); g.connect(ac.destination); o.start(t); o.stop(t+dur);
+}
+const SND={
+  drop(){ beep(500,0.07,"triangle",0.12,-150); },
+  score(n){ beep(660+Math.min(n,12)*60,0.14,"square",0.09,120); beep(880+Math.min(n,12)*60,0.18,"sine",0.10,200); },
+  jp(){ [0,80,160,240].forEach((d,i)=>setTimeout(()=>beep(700+i*180,0.16,"square",0.1,150),d)); },
+  lost(){ beep(180,0.2,"sawtooth",0.06,-60); },
+  boom(){ beep(90,0.4,"sawtooth",0.25,-55); beep(50,0.5,"square",0.2,-20); },
+  buy(){ beep(880,0.09,"sine",0.12,240); beep(1320,0.12,"sine",0.1,200); },
+  clear(){ [523,659,784,1046].forEach((f,i)=>setTimeout(()=>beep(f,0.22,"triangle",0.14,30),i*110)); },
+  over(){ [392,330,262,196].forEach((f,i)=>setTimeout(()=>beep(f,0.3,"triangle",0.12,-20),i*160)); },
+  hop(){ beep(420,0.06,"triangle",0.05,180); },
+};
+
+/* ================= ゲーム状態 ================= */
+let S=null;
+function targetFor(n){ return Math.floor(100*Math.pow(1.75,n-1)/10)*10; }
+function mkCoin(type,x,y,tier){
+  const d=TYPES[type];
+  return {type, d, x, y, vx:0, vy:0, r:d.r, tier, state:"live",
+          dropT:0, fallT:0, fallZone:null, hopT:1+Math.random(), fuse:-1, spin:Math.random()*6.28};
+}
+function zones(){
+  const half=110+S.up.zone*28;
+  return {sL:Math.max(WALL_L,CX-half), sR:Math.min(WALL_R,CX+half), jL:CX-20, jR:CX+20};
+}
+function pusherFront(t){
+  const spd=0.85+S.up.speed*0.22;
+  return PUSH_MIN+(PUSH_MAX-PUSH_MIN)*(0.5-0.5*Math.cos(t*spd));
+}
+function droppable(){ return S.stock+ORDER.slice(1).reduce((a,k)=>a+S.inv[k],0); }
+function newGame(){
+  S={
+    phase:"play", round:1, score:0, target:targetFor(1),
+    tickets:0, stock:30, inv:{gold:0,bomb:1,rabbit:0,magnet:0,big:0,split:0},
+    sel:"normal", coins:[], parts:[], floats:[],
+    t:0, prevPF:PUSH_MIN, combo:0, comboT:0, shake:0,
+    dropCd:0, outT:-1, aimX:CX,
+    up:{zone:0,combo:0,ticket:0,speed:0,stock:0},
+    totalScore:0, warmup:false, warmFell:0,
+  };
+  // 台を飽和密度で敷き詰める（隙間があると押し出しが発生しない）
+  for(let row=0;row<12;row++){
+    const y=255+row*27;
+    for(let col=0;col<13;col++){
+      if(Math.random()<0.05) continue;
+      const x=WALL_L+28+col*29+(Math.random()-0.5)*6;
+      S.coins.push(mkCoin("normal", x, y+(Math.random()-0.5)*4, 2));
+    }
+  }
+  // ウォームアップ：無得点で溢れ始めるまで先回し
+  S.warmup=true; S.warmFell=0;
+  for(let i=0;i<4800 && S.warmFell<10;i++){
+    if(i%40===0){
+      S.coins.push(mkCoin("normal", WALL_L+40+Math.random()*(WALL_R-WALL_L-80), BACK+30+Math.random()*60, 1));
+    }
+    update(1/60);
+  }
+  S.warmup=false;
+  S.parts.length=0; S.floats.length=0;
+  refreshUI(); sbDirty=true;
+}
+
+/* ================= 投入 ================= */
+function tryDrop(x){
+  if(!S||S.phase!=="play"||S.dropCd>0) return;
+  let type=S.sel;
+  if(type==="normal"){ if(S.stock<=0){ autoSelect(); return; } S.stock--; }
+  else { if(S.inv[type]<=0){ S.sel="normal"; refreshUI(); return; } S.inv[type]--; }
+  x=Math.max(WALL_L+TYPES[type].r+4, Math.min(WALL_R-TYPES[type].r-4, x));
+  const c=mkCoin(type,x,DROP_Y,1);
+  c.state="drop"; c.dropT=0.32;
+  S.coins.push(c);
+  S.dropCd=0.34;
+  SND.drop();
+  refreshUI(); sbDirty=true;
+}
+function autoSelect(){
+  if(S.stock>0){ S.sel="normal"; }
+  else { const k=ORDER.slice(1).find(k=>S.inv[k]>0); if(k) S.sel=k; }
+  refreshUI();
+}
+
+/* ================= スコア処理 ================= */
+function coinFalls(c){
+  c.state="fall"; c.fallT=0;
+  if(S.warmup){ c.fallZone="lost"; S.warmFell++; return; }
+  const z=zones();
+  if(c.x>=z.sL&&c.x<=z.sR){
+    S.combo++; S.comboT=2.0+S.up.combo*0.6;
+    let mult=1+(S.combo-1)*0.25;
+    const jp=(c.x>=z.jL&&c.x<=z.jR);
+    if(jp) mult*=3;
+    const pts=Math.round(c.d.value*mult);
+    S.score+=pts; S.totalScore+=pts;
+    const tk=c.d.ticket+S.up.ticket;
+    S.tickets+=tk;
+    addFloat(c.x,"+"+pts,jp?"#ffd94d":"#7dffb0",jp);
+    if(tk>1) addFloat(c.x,"🎫+"+tk,"#7fe3ff",false,22);
+    burst3D(c.x,FRONT,jp?0xffd94d:0x7dffb0,jp?26:12);
+    jp?SND.jp():SND.score(S.combo);
+    c.fallZone="score";
+    if(S.score>=S.target) setTimeout(roundClear,600);
+  }else{
+    addFloat(c.x,"ロスト","#c9a98a");
+    SND.lost();
+    c.fallZone="lost";
+  }
+  refreshUI(); sbDirty=true;
+}
+function explode(b){
+  burst3D(b.x,b.y,0xff8a4a,34); burst3D(b.x,b.y,0xffd94d,20);
+  S.shake=10; SND.boom();
+  for(const c of S.coins){
+    if(c===b||c.tier!==2||c.state!=="live") continue;
+    const dx=c.x-b.x, dy=c.y-b.y, d=Math.hypot(dx,dy);
+    if(d<120&&d>0.01){
+      const p=340*(1-d/120)/c.d.mass;
+      c.vx+=dx/d*p; c.vy+=dy/d*p+40;
+    }
+  }
+  b.state="dead";
+}
+
+/* ================= 物理更新（2D版と同一） ================= */
+function update(dt){
+  if(!S) return;
+  S.t+=dt;
+  const pF=pusherFront(S.t);
+  const dPF=pF-S.prevPF; S.prevPF=pF;
+  const faceSpeed=Math.max(0,dPF/dt);
+  if(S.dropCd>0) S.dropCd-=dt;
+  if(S.comboT>0){ S.comboT-=dt; if(S.comboT<=0) S.combo=0; }
+  if(S.shake>0) S.shake=Math.max(0,S.shake-40*dt);
+
+  if(S.phase!=="play"&&!S.warmup){ updateFx(dt); return; }
+
+  const damp=Math.max(0,1-5.5*dt);
+  for(const c of S.coins){
+    if(c.state==="drop"){
+      c.dropT-=dt;
+      if(c.dropT<=0){ c.state="live"; }
+      continue;
+    }
+    if(c.state==="fall"){ c.fallT+=dt; continue; }
+    if(c.state!=="live") continue;
+
+    if(c.tier===1){
+      if(dPF>0) c.y+=dPF;
+      c.x+=c.vx*dt; c.y+=c.vy*dt;
+      c.vx*=damp; c.vy*=damp;
+      if(c.y<BACK+c.r) c.y=BACK+c.r;
+      if(c.y>pF-2){
+        c.tier=2; c.vy+=60;
+        if(c.type==="split"){
+          c.state="dead";
+          for(let i=-1;i<=1;i++){
+            const nc=mkCoin("normal",c.x+i*10,c.y+Math.abs(i)*6,2);
+            nc.vx=i*70; nc.vy=70; S.coins.push(nc);
+          }
+          burst3D(c.x,c.y,0xa8f0c0,14);
+        }
+      }
+    }else{
+      if(c.type==="rabbit"){ c.hopT-=dt; if(c.hopT<=0){ c.hopT=1.4+Math.random()*0.5; c.vy+=170; c.vx+=(Math.random()-0.5)*90; SND.hop(); } }
+      if(c.type==="bomb"){ if(c.fuse<0) c.fuse=4; else { c.fuse-=dt; if(c.fuse<=0){ explode(c); continue; } } }
+      if(c.type==="magnet"){
+        for(const o of S.coins){
+          if(o===c||o.tier!==2||o.state!=="live") continue;
+          const dx=c.x-o.x, dy=c.y-o.y, d=Math.hypot(dx,dy);
+          if(d<110&&d>1){ const p=170*(1-d/110)*dt; o.vx+=dx/d*p; o.vy+=dy/d*p; }
+        }
+      }
+      c.x+=c.vx*dt; c.y+=c.vy*dt;
+      c.vx*=damp; c.vy*=damp;
+      if(c.y-c.r<pF){ c.y=pF+c.r; if(c.vy<faceSpeed) c.vy=faceSpeed+20; }
+      if(c.y>FRONT){ coinFalls(c); continue; }
+    }
+    if(c.x<WALL_L+c.r){ c.x=WALL_L+c.r; c.vx=Math.abs(c.vx)*0.4; }
+    if(c.x>WALL_R-c.r){ c.x=WALL_R-c.r; c.vx=-Math.abs(c.vx)*0.4; }
+  }
+
+  // コイン同士の衝突（同じ段のみ）— 後方への押し戻しを減衰させるラチェット摩擦つき
+  const RATCHET=0.15;
+  const live=S.coins.filter(c=>c.state==="live");
+  for(let it=0; it<5; it++){
+    for(let i=0;i<live.length;i++){
+      const a=live[i];
+      for(let j=i+1;j<live.length;j++){
+        const b=live[j];
+        if(a.tier!==b.tier) continue;
+        const dx=b.x-a.x, dy=b.y-a.y;
+        const rr=a.r+b.r;
+        if(Math.abs(dx)>rr||Math.abs(dy)>rr) continue;
+        const d2=dx*dx+dy*dy;
+        if(d2>=rr*rr||d2<0.0001) continue;
+        const d=Math.sqrt(d2), nx=dx/d, ny=dy/d, ov=rr-d;
+        const ma=a.d.mass, mb=b.d.mass, tm=ma+mb;
+        let ayd=-ny*ov*(mb/tm); if(ayd<0) ayd*=RATCHET;
+        let byd= ny*ov*(ma/tm); if(byd<0) byd*=RATCHET;
+        a.x-=nx*ov*(mb/tm); a.y+=ayd;
+        b.x+=nx*ov*(ma/tm); b.y+=byd;
+        const rv=(b.vx-a.vx)*nx+(b.vy-a.vy)*ny;
+        if(rv<0){ const imp=-rv*0.6; a.vx-=nx*imp*(mb/tm)*2; a.vy-=ny*imp*(mb/tm)*2; b.vx+=nx*imp*(ma/tm)*2; b.vy+=ny*imp*(ma/tm)*2; }
+      }
+    }
+  }
+
+  S.coins=S.coins.filter(c=>c.state!=="dead"&&!(c.state==="fall"&&c.fallT>0.6));
+
+  if(!S.warmup){
+    if(droppable()<=0){
+      if(S.outT<0) S.outT=9;
+      S.outT-=dt;
+      if(S.outT<=0){ gameOver(); }
+    }else S.outT=-1;
+  }
+  updateFx(dt);
+}
+function updateFx(dt){
+  for(const p of S.parts){ p.t-=dt; p.px+=p.vx*dt; p.py+=p.vy*dt; p.pz+=p.vz*dt; p.vy-=14*dt; }
+  S.parts=S.parts.filter(p=>p.t>0);
+  for(const f of S.floats){ f.t-=dt; f.up+=40*dt; }
+  S.floats=S.floats.filter(f=>f.t>0);
+}
+
+/* ================= ラウンド進行・ショップ ================= */
+const SHOP_POOL=[
+  {id:"coins15", nm:"コイン ×15",      ds:"ストックにコインを15枚追加",              cost:5,  can:()=>true,           fn:()=>S.stock+=15},
+  {id:"coins40", nm:"コイン大袋 ×40",  ds:"ストックにコインを40枚追加",              cost:11, can:()=>true,           fn:()=>S.stock+=40},
+  {id:"gold3",   nm:"ゴールド ×3",     ds:"スコア5倍のゴールドコイン",               cost:8,  can:()=>true,           fn:()=>S.inv.gold+=3},
+  {id:"bomb2",   nm:"ボム ×2",         ds:"着地4秒後に爆発、周囲を吹き飛ばす",       cost:7,  can:()=>true,           fn:()=>S.inv.bomb+=2},
+  {id:"rabbit3", nm:"ウサギ ×3",       ds:"自分で跳ねて前へ進むコイン",              cost:6,  can:()=>true,           fn:()=>S.inv.rabbit+=3},
+  {id:"magnet2", nm:"マグネット ×2",   ds:"周囲のコインを引き寄せる",                cost:7,  can:()=>true,           fn:()=>S.inv.magnet+=2},
+  {id:"big2",    nm:"ビッグ ×2",       ds:"大きく重い、押し出し特化コイン",          cost:8,  can:()=>true,           fn:()=>S.inv.big+=2},
+  {id:"split3",  nm:"スプリット ×3",   ds:"台に降りると3枚に分裂する",               cost:6,  can:()=>true,           fn:()=>S.inv.split+=3},
+  {id:"zone",    nm:"スコアゾーン拡大", ds:"緑のスコアゾーンが左右に広がる (最大3)",  cost:12, can:()=>S.up.zone<3,    fn:()=>{S.up.zone++; buildZoneStrips();}},
+  {id:"combo",   nm:"コンボ延長",      ds:"コンボ継続時間 +0.6秒 (最大3)",           cost:10, can:()=>S.up.combo<3,   fn:()=>S.up.combo++},
+  {id:"ticket",  nm:"チケットブースト", ds:"コイン獲得時のチケット +1 (最大3)",       cost:14, can:()=>S.up.ticket<3,  fn:()=>S.up.ticket++},
+  {id:"speed",   nm:"プッシャー加速",  ds:"プッシャーの動きが速くなる (最大3)",      cost:9,  can:()=>S.up.speed<3,   fn:()=>S.up.speed++},
+  {id:"stock",   nm:"補給強化",        ds:"毎ラウンド開始時のコイン +12 (最大3)",    cost:12, can:()=>S.up.stock<3,   fn:()=>S.up.stock++},
+];
+function roundClear(){
+  if(!S||S.phase!=="play"||S.score<S.target) return;
+  S.phase="shop"; S.outT=-1;
+  SND.clear();
+  const pool=SHOP_POOL.filter(it=>it.can());
+  const picks=[];
+  while(picks.length<4&&pool.length){ picks.push(pool.splice(Math.floor(Math.random()*pool.length),1)[0]); }
+  const grid=document.getElementById("shopGrid");
+  grid.innerHTML="";
+  document.getElementById("shopTitle").textContent=`🎉 ラウンド ${S.round} クリア！`;
+  for(const it of picks){
+    const div=document.createElement("div");
+    div.className="shopItem";
+    div.innerHTML=`<div class="nm">${it.nm}</div><div class="ds">${it.ds}</div><button>🎫 ${it.cost} で購入</button>`;
+    const btn=div.querySelector("button");
+    btn.onclick=()=>{
+      if(S.tickets<it.cost) return;
+      S.tickets-=it.cost; it.fn(); SND.buy();
+      div.classList.add("sold"); btn.disabled=true; btn.textContent="購入済み";
+      updateShopBtns(); refreshUI(); sbDirty=true;
+    };
+    grid.appendChild(div);
+  }
+  updateShopBtns();
+  document.getElementById("shopOv").style.display="flex";
+  refreshUI(); sbDirty=true;
+}
+function updateShopBtns(){
+  document.getElementById("shopTkt").textContent=S.tickets;
+  document.querySelectorAll("#shopGrid .shopItem:not(.sold) button").forEach(b=>{
+    const cost=parseInt(b.textContent.replace(/[^0-9]/g,""),10);
+    b.disabled=S.tickets<cost;
+  });
+}
+function nextRound(){
+  S.round++; S.score=0; S.target=targetFor(S.round);
+  S.stock+=30+S.up.stock*12;
+  S.phase="play"; S.outT=-1; S.combo=0; S.comboT=0;
+  document.getElementById("shopOv").style.display="none";
+  refreshUI(); sbDirty=true;
+}
+function gameOver(){
+  S.phase="over"; SND.over();
+  document.getElementById("overText").innerHTML=
+    `到達ラウンド：<b style="color:#c0392b;font-size:20px">${S.round}</b><br>`+
+    `このラウンドのスコア：${S.score} / ${S.target}<br>`+
+    `累計スコア：<b style="color:#27ae60">${S.totalScore}</b>`;
+  document.getElementById("overOv").style.display="flex";
+}
+
+/* ================= 3D 描画 ================= */
+const K=1/20;                                   // sim→world スケール
+const sx=x=>(x-CX)*K;                           // sim x → world x
+const sz=y=>(y-(BACK+FRONT)/2)*K;               // sim y → world z
+const TABLE_W=(WALL_R-WALL_L)*K;                // 20
+const Z_FRONT=sz(FRONT), Z_BACK=sz(BACK);
+const PUSH_TOP=0.42, COIN_H=0.16;
+
+// タッチ端末（≒スマホ・タブレット）を検出し、負荷の大きい描画設定を自動で軽量化する
+const isMobile = matchMedia("(pointer:coarse)").matches || navigator.maxTouchPoints>0;
+const COIN_SEGS = isMobile?14:22;
+
+const stageEl=document.getElementById("stage");
+const glCanvas=document.getElementById("gl");
+const renderer=new THREE.WebGLRenderer({canvas:glCanvas, antialias:!isMobile, preserveDrawingBuffer:true});
+renderer.shadowMap.enabled=!isMobile;
+renderer.shadowMap.type=THREE.PCFSoftShadowMap;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure=1.12;
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x2b1510);
+scene.fog=new THREE.Fog(0x2b1510, 44, 70);
+const BASE_VFOV=42, BASE_ASPECT=660/740;
+const camera=new THREE.PerspectiveCamera(BASE_VFOV, BASE_ASPECT, 0.1, 100);
+const CAM_POS=new THREE.Vector3(0, 15.5, 27.5);
+const CAM_TGT=new THREE.Vector3(0, 0.8, 2.5);
+camera.position.copy(CAM_POS);
+camera.lookAt(CAM_TGT);
+
+function resize(){
+  const w=stageEl.clientWidth, h=stageEl.clientHeight;
+  if(w<=0||h<=0) return;
+  renderer.setSize(w,h,false);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, isMobile?1.5:2));
+  const aspect=w/h;
+  camera.aspect=aspect;
+  // 縦長画面（スマホ縦持ちなど）では、筐体の横幅が見切れないよう垂直画角を広げて水平方向の見え方を維持する
+  if(aspect<BASE_ASPECT){
+    const halfHTan=Math.tan(THREE.MathUtils.degToRad(BASE_VFOV)/2)*BASE_ASPECT;
+    const vfovDeg=THREE.MathUtils.radToDeg(2*Math.atan(halfHTan/aspect));
+    camera.fov=Math.min(vfovDeg,68);
+  }else{
+    camera.fov=BASE_VFOV;
+  }
+  camera.updateProjectionMatrix();
+}
+window.addEventListener("resize",resize);
+window.addEventListener("orientationchange",()=>setTimeout(resize,50));
+resize();
+
+/* --- ライティング --- */
+scene.add(new THREE.AmbientLight(0xffe0b8, 0.55));
+const sun=new THREE.DirectionalLight(0xfff0d8, 1.6);
+sun.position.set(6, 22, 14);
+sun.castShadow=true;
+sun.shadow.mapSize.set(1024,1024);
+sun.shadow.camera.left=-16; sun.shadow.camera.right=16;
+sun.shadow.camera.top=20; sun.shadow.camera.bottom=-20;
+sun.shadow.camera.far=60;
+scene.add(sun);
+const warm1=new THREE.PointLight(0xffb060, 30, 30); warm1.position.set(-9, 7, 8); scene.add(warm1);
+const warm2=new THREE.PointLight(0xffb060, 30, 30); warm2.position.set(9, 7, 8); scene.add(warm2);
+
+/* --- テクスチャ生成ヘルパー --- */
+function canvasTex(w,h,fn){
+  const cv=document.createElement("canvas"); cv.width=w; cv.height=h;
+  fn(cv.getContext("2d"),w,h);
+  const t=new THREE.CanvasTexture(cv);
+  t.colorSpace=THREE.SRGBColorSpace;
+  return t;
+}
+// 紅白ストライプ（サーカステント）
+const stripeTex=canvasTex(256,256,(c,w,h)=>{
+  for(let i=0;i<8;i++){ c.fillStyle=i%2?"#f7ecd8":"#d6452e"; c.fillRect(i*w/8,0,w/8,h); }
+});
+stripeTex.wrapS=stripeTex.wrapT=THREE.RepeatWrapping;
+const stripeTexV=stripeTex.clone(); stripeTexV.needsUpdate=true; stripeTexV.repeat.set(3,1);
+// 木目っぽい床
+const woodTex=canvasTex(256,256,(c,w,h)=>{
+  c.fillStyle="#8a5a30"; c.fillRect(0,0,w,h);
+  for(let i=0;i<40;i++){ c.strokeStyle=`rgba(60,35,15,${0.1+Math.random()*0.2})`; c.lineWidth=1+Math.random()*3;
+    c.beginPath(); c.moveTo(0,Math.random()*h); c.bezierCurveTo(w/3,Math.random()*h,w*2/3,Math.random()*h,w,Math.random()*h); c.stroke(); }
+});
+woodTex.wrapS=woodTex.wrapT=THREE.RepeatWrapping; woodTex.repeat.set(3,3);
+// テーブル表面（フェルト風）
+const feltTex=canvasTex(128,128,(c,w,h)=>{
+  c.fillStyle="#3e6b4f"; c.fillRect(0,0,w,h);
+  for(let i=0;i<600;i++){ c.fillStyle=`rgba(255,255,255,${Math.random()*0.04})`; c.fillRect(Math.random()*w,Math.random()*h,1,1); }
+});
+feltTex.wrapS=feltTex.wrapT=THREE.RepeatWrapping; feltTex.repeat.set(4,4);
+
+/* --- コインの顔テクスチャ --- */
+function coinFaceTex(type){
+  return canvasTex(128,128,(c)=>{
+    const d=TYPES[type];
+    c.fillStyle=d.col; c.beginPath(); c.arc(64,64,63,0,6.28); c.fill();
+    c.strokeStyle=d.col2; c.lineWidth=7; c.beginPath(); c.arc(64,64,56,0,6.28); c.stroke();
+    c.textAlign="center"; c.textBaseline="middle";
+    if(type==="normal"||type==="big"){
+      // たぬき顔
+      c.fillStyle="#7a4520";
+      c.beginPath(); c.arc(38,30,14,0,6.28); c.fill();   // 耳
+      c.beginPath(); c.arc(90,30,14,0,6.28); c.fill();
+      c.fillStyle="#fbe8c8";
+      c.beginPath(); c.ellipse(64,74,34,28,0,0,6.28); c.fill();  // 顔の白部分
+      c.fillStyle="#5a3416";
+      c.beginPath(); c.ellipse(46,62,11,13,0.3,0,6.28); c.fill(); // 目まわり模様
+      c.beginPath(); c.ellipse(82,62,11,13,-0.3,0,6.28); c.fill();
+      c.fillStyle="#fff";
+      c.beginPath(); c.arc(46,62,4.5,0,6.28); c.fill();
+      c.beginPath(); c.arc(82,62,4.5,0,6.28); c.fill();
+      c.fillStyle="#222";
+      c.beginPath(); c.arc(47,63,2.4,0,6.28); c.fill();
+      c.beginPath(); c.arc(81,63,2.4,0,6.28); c.fill();
+      c.beginPath(); c.ellipse(64,80,6,4.5,0,0,6.28); c.fill();  // 鼻
+      c.strokeStyle="#222"; c.lineWidth=2;
+      c.beginPath(); c.arc(64,86,7,0.3,2.84); c.stroke();        // 口
+    }else{
+      const sym={gold:"★",bomb:"💣",rabbit:"🐰",magnet:"🧲",split:"÷3"}[type]||"?";
+      if(type==="gold"){ c.fillStyle="#8a6400"; c.font="bold 64px sans-serif"; }
+      else if(type==="split"){ c.fillStyle="#1d6b3c"; c.font="bold 52px sans-serif"; }
+      else c.font="64px sans-serif";
+      c.fillText(sym,64,70);
+    }
+  });
+}
+const coinGeos={}, coinMats={};
+for(const k of ORDER){
+  const d=TYPES[k];
+  coinGeos[k]=new THREE.CylinderGeometry(d.r*K, d.r*K, COIN_H, COIN_SEGS);
+  const face=coinFaceTex(k);
+  coinMats[k]=[
+    new THREE.MeshStandardMaterial({color:d.col2, roughness:0.55, metalness:0.25}),
+    new THREE.MeshStandardMaterial({map:face, roughness:0.5, metalness:0.2}),
+    new THREE.MeshStandardMaterial({color:d.col2, roughness:0.55, metalness:0.25}),
+  ];
+}
+
+/* --- 筐体の構築 --- */
+const world=new THREE.Group(); scene.add(world);
+function box(w,h,d,mat){ const m=new THREE.Mesh(new THREE.BoxGeometry(w,h,d),mat); m.castShadow=m.receiveShadow=true; return m; }
+const creamMat=new THREE.MeshStandardMaterial({color:0xf3e2c0, roughness:0.8});
+const redMat=new THREE.MeshStandardMaterial({color:0xc0392b, roughness:0.7});
+const darkWoodMat=new THREE.MeshStandardMaterial({map:woodTex, roughness:0.85});
+const stripeMat=new THREE.MeshStandardMaterial({map:stripeTexV, roughness:0.85});
+
+// テーブル本体
+{
+  const tableMat=new THREE.MeshStandardMaterial({map:feltTex, roughness:0.9});
+  const table=box(TABLE_W, 1.2, Z_FRONT-Z_BACK, tableMat);
+  table.position.set(0, -0.6, (Z_FRONT+Z_BACK)/2);
+  world.add(table);
+  // テーブル前面（木）
+  const lip=box(TABLE_W+1.2, 2.0, 0.6, darkWoodMat);
+  lip.position.set(0, -1.6, Z_FRONT+0.3);
+  world.add(lip);
+}
+// 側壁（内側クリーム、上に紅白ストライプの天蓋壁）
+for(const side of [-1,1]){
+  const wall=box(0.7, 2.2, Z_FRONT-Z_BACK+2, creamMat);
+  wall.position.set(side*(TABLE_W/2+0.35), 0.6, (Z_FRONT+Z_BACK)/2);
+  world.add(wall);
+  const tent=box(0.6, 9, Z_FRONT-Z_BACK+2, stripeMat);
+  tent.position.set(side*(TABLE_W/2+1.0), 5.5, (Z_FRONT+Z_BACK)/2);
+  world.add(tent);
+  // 手すりトップ
+  const rail=box(1.1, 0.4, Z_FRONT-Z_BACK+2.4, redMat);
+  rail.position.set(side*(TABLE_W/2+0.35), 1.9, (Z_FRONT+Z_BACK)/2);
+  world.add(rail);
+}
+// 奥の壁＋スコアボード
+const sbCanvas=document.createElement("canvas"); sbCanvas.width=640; sbCanvas.height=280;
+const sbTex=new THREE.CanvasTexture(sbCanvas); sbTex.colorSpace=THREE.SRGBColorSpace;
+let sbDirty=true;
+function drawScoreboard(){
+  const c=sbCanvas.getContext("2d");
+  const g=c.createLinearGradient(0,0,0,280);
+  g.addColorStop(0,"#1a2a4a"); g.addColorStop(1,"#0e1830");
+  c.fillStyle=g; c.fillRect(0,0,640,280);
+  c.strokeStyle="#ffcf6e"; c.lineWidth=8; c.strokeRect(6,6,628,268);
+  c.textAlign="center";
+  c.fillStyle="#8fd0ff"; c.font="bold 34px sans-serif";
+  c.fillText(`Round ${S?S.round:1}`, 320, 52);
+  c.fillStyle="#ffe08a"; c.font="bold 64px sans-serif";
+  c.fillText(`${S?S.score.toLocaleString():0}`, 320, 130);
+  c.fillStyle="#a9c4e8"; c.font="bold 26px sans-serif";
+  c.fillText(`Target  ${S?S.target.toLocaleString():0}`, 320, 176);
+  c.textAlign="left";
+  c.fillStyle="#9fe8b0"; c.font="bold 26px sans-serif";
+  c.fillText(`Hand ${S?S.stock:0}`, 40, 240);
+  c.textAlign="right";
+  c.fillStyle="#ffb0c8";
+  c.fillText(S&&S.combo>=2?`Combo x${S.combo}`:"", 600, 240);
+  sbTex.needsUpdate=true;
+}
+{
+  const backTower=box(TABLE_W+4.5, 13, 1.2, stripeMat);
+  backTower.position.set(0, 5.2, Z_BACK-1.6);
+  world.add(backTower);
+  const sb=new THREE.Mesh(new THREE.PlaneGeometry(13.5, 5.9),
+    new THREE.MeshBasicMaterial({map:sbTex}));
+  sb.position.set(0, 6.4, Z_BACK-0.95);
+  sb.rotation.x=-0.06;
+  world.add(sb);
+  const sbFrame=box(14.4, 6.8, 0.35, darkWoodMat);
+  sbFrame.position.set(0, 6.4, Z_BACK-1.15);
+  world.add(sbFrame);
+  // テントの屋根（手前上部の飾り幕）
+  const valance=box(TABLE_W+6, 2.2, 0.4, stripeMat);
+  valance.position.set(0, 12.5, 4);
+  world.add(valance);
+}
+// プッシャー（可動）
+const pusher=box(TABLE_W-0.06, PUSH_TOP, 14, new THREE.MeshStandardMaterial({color:0xe74c3c, roughness:0.55}));
+pusher.position.y=PUSH_TOP/2;
+world.add(pusher);
+const pusherTopPlate=box(TABLE_W-0.1, 0.06, 13.9, creamMat);
+world.add(pusherTopPlate);
+const pushLabel=canvasTex(256,64,(c)=>{
+  c.fillStyle="#f7ecd8"; c.font="bold 40px sans-serif"; c.textAlign="center"; c.textBaseline="middle";
+  c.fillText("― P U S H ―",128,32);
+});
+const pushFace=new THREE.Mesh(new THREE.PlaneGeometry(6,1.0),
+  new THREE.MeshBasicMaterial({map:pushLabel, transparent:true}));
+world.add(pushFace);
+
+// 前端の奈落＋ゾーン表示
+const zoneGroup=new THREE.Group(); world.add(zoneGroup);
+function zoneLabelTex(txt,color){
+  return canvasTex(256,64,(c)=>{
+    c.fillStyle=color; c.font="bold 34px sans-serif"; c.textAlign="center"; c.textBaseline="middle";
+    c.fillText(txt,128,32);
+  });
+}
+function buildZoneStrips(){
+  zoneGroup.clear();
+  if(!S) return;
+  const z=zones();
+  const y=-1.35, depth=2.6, zc=Z_FRONT+1.5;
+  const mk=(x1,x2,color,label,labelColor)=>{
+    const w=(x2-x1)*K;
+    const m=new THREE.Mesh(new THREE.BoxGeometry(w,0.25,depth),
+      new THREE.MeshStandardMaterial({color, roughness:0.6, emissive:color, emissiveIntensity:0.25}));
+    m.position.set((sx(x1)+sx(x2))/2, y, zc);
+    zoneGroup.add(m);
+    if(label){
+      const p=new THREE.Mesh(new THREE.PlaneGeometry(Math.min(w*0.9,3.2),0.8),
+        new THREE.MeshBasicMaterial({map:zoneLabelTex(label,labelColor), transparent:true}));
+      p.rotation.x=-Math.PI/2;
+      p.position.set((sx(x1)+sx(x2))/2, y+0.14, zc);
+      zoneGroup.add(p);
+    }
+  };
+  mk(WALL_L, z.sL, 0x8e2a1c, "ロスト", "#ffb3a0");
+  mk(z.sR, WALL_R, 0x8e2a1c, "ロスト", "#ffb3a0");
+  mk(z.sL, z.jL, 0x2e7d4f, "スコア", "#c8ffd8");
+  mk(z.jR, z.sR, 0x2e7d4f, "スコア", "#c8ffd8");
+  mk(z.jL, z.jR, 0xd8a012, "×3", "#5a3800");
+}
+
+// ガーランドライト（フェストゥーン）
+{
+  const bulbColors=[0xffd94d,0xff6b6b,0x7de08a,0x7fc8ff,0xffa8d8];
+  const bulbGeo=new THREE.SphereGeometry(0.16,10,10);
+  for(const zPos of [Z_FRONT-2, (Z_FRONT+Z_BACK)/2, Z_BACK+3]){
+    const pts=[];
+    const span=TABLE_W+4;
+    for(let i=0;i<=24;i++){
+      const u=i/24;
+      const x=-span/2+u*span;
+      const y=11.2-Math.sin(u*Math.PI)*1.6*(zPos>0?1.15:1);
+      pts.push(new THREE.Vector3(x,y,zPos));
+    }
+    const line=new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts),
+      new THREE.LineBasicMaterial({color:0x553322}));
+    world.add(line);
+    for(let i=1;i<24;i+=2){
+      const b=new THREE.Mesh(bulbGeo, new THREE.MeshStandardMaterial({
+        color:bulbColors[(i>>1)%5], emissive:bulbColors[(i>>1)%5], emissiveIntensity:1.6}));
+      b.position.copy(pts[i]).y-=0.18;
+      world.add(b);
+    }
+  }
+}
+// 三角旗（バンティング）
+{
+  const flagColors=[0xd6452e,0xf7ecd8,0x2e7d8f,0xf0b429];
+  const tri=new THREE.Shape();
+  tri.moveTo(-0.35,0); tri.lineTo(0.35,0); tri.lineTo(0,-0.75); tri.closePath();
+  const triGeo=new THREE.ShapeGeometry(tri);
+  for(let i=0;i<14;i++){
+    const f=new THREE.Mesh(triGeo, new THREE.MeshBasicMaterial({color:flagColors[i%4], side:THREE.DoubleSide}));
+    f.position.set(-TABLE_W/2-1+i*(TABLE_W+2)/13, 11.3, 8);
+    f.rotation.y=(Math.random()-0.5)*0.3;
+    world.add(f);
+  }
+}
+
+/* --- コインメッシュ管理 --- */
+const coinMeshes=new Map();
+function coinY(c){
+  if(c.tier===1) return PUSH_TOP+COIN_H/2;
+  return COIN_H/2;
+}
+function syncCoins(){
+  const alive=new Set();
+  for(const c of S.coins){
+    alive.add(c);
+    let m=coinMeshes.get(c);
+    if(!m){
+      m=new THREE.Mesh(coinGeos[c.type], coinMats[c.type]);
+      m.castShadow=true; m.receiveShadow=true;
+      coinMeshes.set(c,m);
+      world.add(m);
+    }
+    const wx=sx(c.x), wz=sz(Math.min(c.y,FRONT));
+    if(c.state==="drop"){
+      const k=c.dropT/0.32;                        // 1→0
+      m.position.set(wx, coinY(c)+k*5.5, sz(c.y));
+      m.rotation.set(k*2.5, c.spin, 0);
+    }else if(c.state==="fall"){
+      const k=c.fallT/0.6;
+      m.position.set(wx, COIN_H/2-k*k*5.5, Z_FRONT+0.4+k*1.6);
+      m.rotation.x=-k*2.2;
+      m.rotation.y=c.spin;
+    }else{
+      m.position.set(wx, coinY(c), wz);
+      m.rotation.set(0, c.spin, 0);
+      if(c.type==="bomb"&&c.fuse>0){
+        const blink=Math.sin(S.t*12)>0?0.5:0;
+        m.material[1].emissive=new THREE.Color(0xff3000);
+        m.material[1].emissiveIntensity=blink*(1-c.fuse/4);
+      }
+    }
+  }
+  for(const [c,m] of coinMeshes){
+    if(!alive.has(c)){ world.remove(m); coinMeshes.delete(c); }
+  }
+}
+
+/* --- パーティクル --- */
+const partGeo=new THREE.SphereGeometry(0.09,6,6);
+const partMeshes=[];
+function burst3D(simX,simY,color,n){
+  if(S.warmup) return;
+  for(let i=0;i<n;i++){
+    const a=Math.random()*6.28;
+    S.parts.push({
+      px:sx(simX), py:0.6, pz:sz(Math.min(simY,FRONT)),
+      vx:Math.cos(a)*(2+Math.random()*5), vy:3+Math.random()*5, vz:Math.sin(a)*(2+Math.random()*5),
+      t:0.5+Math.random()*0.4, color
+    });
+  }
+}
+function syncParts(){
+  while(partMeshes.length<S.parts.length){
+    const m=new THREE.Mesh(partGeo, new THREE.MeshBasicMaterial({color:0xffffff, transparent:true}));
+    partMeshes.push(m); world.add(m);
+  }
+  for(let i=0;i<partMeshes.length;i++){
+    const m=partMeshes[i];
+    if(i<S.parts.length){
+      const p=S.parts[i];
+      m.visible=true;
+      m.position.set(p.px,p.py,p.pz);
+      m.material.color.setHex(p.color);
+      m.material.opacity=Math.min(1,p.t*2);
+    }else m.visible=false;
+  }
+}
+
+/* --- ゴースト（投入位置） --- */
+const ghost=new THREE.Mesh(coinGeos.normal,
+  new THREE.MeshStandardMaterial({color:0xffd94d, transparent:true, opacity:0.45}));
+world.add(ghost);
+
+/* --- フロートテキスト（HTML） --- */
+const floatsEl=document.getElementById("floats");
+function addFloat(simX,txt,color,big=false,extraDrop=0){
+  S.floats.push({x:simX, txt, color, big, t:1.1, up:-extraDrop});
+}
+const floatDivs=[];
+const _v=new THREE.Vector3();
+function syncFloats(){
+  while(floatDivs.length<S.floats.length){
+    const d=document.createElement("div");
+    d.className="float"; floatsEl.appendChild(d); floatDivs.push(d);
+  }
+  const w=stageEl.clientWidth, h=stageEl.clientHeight;
+  for(let i=0;i<floatDivs.length;i++){
+    const d=floatDivs[i];
+    if(i<S.floats.length){
+      const f=S.floats[i];
+      _v.set(sx(f.x), 0.9, Z_FRONT+0.8).project(camera);
+      d.style.display="block";
+      d.style.left=((_v.x*0.5+0.5)*w)+"px";
+      d.style.top=((-_v.y*0.5+0.5)*h - f.up)+"px";
+      d.style.color=f.color;
+      d.style.fontSize=f.big?"24px":"16px";
+      d.style.opacity=Math.min(1,f.t*2.2);
+      d.textContent=f.txt;
+    }else d.style.display="none";
+  }
+}
+
+/* ================= UI ================= */
+function refreshUI(){
+  if(!S) return;
+  document.getElementById("uiRound").textContent=S.round;
+  document.getElementById("uiScore").textContent=S.score;
+  document.getElementById("uiTarget").textContent=S.target;
+  document.getElementById("uiTkt").textContent=S.tickets;
+  document.getElementById("uiStock").textContent=S.stock;
+  document.getElementById("prog").style.width=Math.min(100,S.score/S.target*100)+"%";
+  for(const k of ORDER){
+    const b=btnEls[k];
+    const n=k==="normal"?S.stock:S.inv[k];
+    b.querySelector(".num").textContent=n;
+    b.classList.toggle("sel",S.sel===k);
+    b.classList.toggle("empty",n<=0);
+  }
+}
+const btnEls={};
+function buildCoinBtns(){
+  const wrap=document.getElementById("coinBtns");
+  for(const k of ORDER){
+    const d=TYPES[k];
+    const b=document.createElement("button");
+    b.className="cbtn";
+    b.title=d.desc;
+    b.innerHTML=`<span class="ic" style="background:radial-gradient(circle at 35% 35%, ${d.col}, ${d.col2})"></span>`+
+                `<span>${d.name}<br><span style="font-size:10px;color:#a06a40">[${d.key}]</span></span><span class="num">0</span>`;
+    b.onclick=()=>{ if(!S) return; const n=k==="normal"?S.stock:S.inv[k]; if(n>0){ S.sel=k; refreshUI(); } };
+    btnEls[k]=b;
+    wrap.appendChild(b);
+  }
+}
+buildCoinBtns();
+
+const comboBox=document.getElementById("comboBox");
+const warnBox=document.getElementById("warnBox");
+function syncHud(){
+  if(S&&S.combo>=2&&S.phase==="play"){
+    comboBox.style.display="block";
+    comboBox.querySelector(".c1").textContent=`${S.combo} COMBO!`;
+    comboBox.querySelector(".c2").textContent=`倍率 ×${(1+(S.combo-1)*0.25).toFixed(2)}`;
+  }else comboBox.style.display="none";
+  if(S&&S.outT>=0&&S.phase==="play"){
+    warnBox.style.display="block";
+    warnBox.textContent=`⚠ コイン切れ！ あと ${Math.ceil(S.outT)} 秒…`;
+  }else warnBox.style.display="none";
+}
+
+/* ================= 入力 ================= */
+let holding=false;
+const ray=new THREE.Raycaster();
+const dropPlane=new THREE.Plane(new THREE.Vector3(0,1,0), -2.2);  // y=2.2 の水平面
+const hit=new THREE.Vector3();
+function updateAim(e){
+  const rect=glCanvas.getBoundingClientRect();
+  const nx=((e.clientX-rect.left)/rect.width)*2-1;
+  const ny=-((e.clientY-rect.top)/rect.height)*2+1;
+  ray.setFromCamera({x:nx,y:ny}, camera);
+  if(ray.ray.intersectPlane(dropPlane, hit)){
+    const simX=hit.x/K+CX;
+    S.aimX=Math.max(WALL_L+16,Math.min(WALL_R-16,simX));
+  }
+}
+glCanvas.addEventListener("contextmenu",e=>e.preventDefault());
+glCanvas.addEventListener("pointermove",e=>{ if(S) updateAim(e); });
+glCanvas.addEventListener("pointerdown",e=>{
+  ensureAC();
+  if(!S) return;
+  e.preventDefault();
+  updateAim(e);
+  holding=true;
+  tryDrop(S.aimX);
+});
+window.addEventListener("pointerup",()=>holding=false);
+window.addEventListener("pointercancel",()=>holding=false);
+window.addEventListener("keydown",e=>{
+  if(!S) return;
+  const k=ORDER.find(k=>TYPES[k].key===e.key);
+  if(k){ const n=k==="normal"?S.stock:S.inv[k]; if(n>0){ S.sel=k; refreshUI(); } }
+  if(e.key===" "){ e.preventDefault(); tryDrop(S.aimX); }
+});
+document.getElementById("startBtn").onclick=()=>{
+  ensureAC();
+  document.getElementById("titleOv").style.display="none";
+  newGame();
+  buildZoneStrips();
+};
+document.getElementById("nextBtn").onclick=nextRound;
+document.getElementById("retryBtn").onclick=()=>{
+  document.getElementById("overOv").style.display="none";
+  newGame();
+  buildZoneStrips();
+};
+document.getElementById("muteBtn").onclick=function(){
+  muted=!muted; this.textContent=muted?"🔇":"🔊";
+};
+
+/* ================= メインループ ================= */
+let last=performance.now(), sbTimer=0;
+function render3D(){
+  if(S){
+    // プッシャー位置
+    const pF=pusherFront(S.t);
+    const zF=sz(pF);
+    pusher.position.z=zF-7;
+    pusherTopPlate.position.set(0, PUSH_TOP+0.031, zF-6.97);
+    pushFace.position.set(0, PUSH_TOP-0.21, zF+0.012);
+    // ゴースト
+    if(S.phase==="play"){
+      ghost.visible=true;
+      const gy=2.2+Math.sin(performance.now()*0.004)*0.1;
+      ghost.position.set(sx(S.aimX), gy, sz(DROP_Y));
+      ghost.material.color.setStyle(TYPES[S.sel].col);
+      ghost.scale.setScalar(TYPES[S.sel].r/13);
+    }else ghost.visible=false;
+    // カメラシェイク
+    camera.position.copy(CAM_POS);
+    if(S.shake>0){
+      camera.position.x+=(Math.random()-0.5)*S.shake*0.045;
+      camera.position.y+=(Math.random()-0.5)*S.shake*0.045;
+    }
+    camera.lookAt(CAM_TGT);
+    syncCoins();
+    syncParts();
+    syncFloats();
+    syncHud();
+    if(sbDirty||S.combo>=2){ drawScoreboard(); sbDirty=false; }
+  }
+  renderer.render(scene, camera);
+}
+function loop(now){
+  const dt=Math.min(1/30,(now-last)/1000);
+  last=now;
+  if(S&&S.phase==="play"&&holding) tryDrop(S.aimX);
+  update(dt);
+  render3D();
+  requestAnimationFrame(loop);
+}
+requestAnimationFrame(loop);
+drawScoreboard();
+
+// 検証用フック
+window.__g={ get S(){return S}, update, tryDrop, render3D, pusherFront, newGame, resize,
+  get renderer(){return renderer}, get scene(){return scene}, get camera(){return camera},
+  isMobile, THREE };
+</script>
+</body>
+</html>
