@@ -46,6 +46,7 @@
   .modal h2 { font-size:22px; color:#c0392b; margin-bottom:10px; }
   .modal p { font-size:13px; color:#6b4226; line-height:1.9; }
   .bigbtn { margin-top:16px; padding:14px 36px; min-height:48px; font-size:17px; font-weight:bold; color:#fff; background:linear-gradient(180deg,#e74c3c,#c0392b); border:3px solid #8e2a1c; border-radius:32px; cursor:pointer; box-shadow:0 5px 16px rgba(192,57,43,.5); touch-action:manipulation; }
+  .bigbtn.alt { background:linear-gradient(180deg,#3498db,#2166a3); border-color:#194a75; box-shadow:0 5px 16px rgba(33,102,163,.5); }
   @media (hover:hover) and (pointer:fine){ .bigbtn:hover { filter:brightness(1.1); } }
   .shopGrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0 4px; }
   .shopItem { background:#ffe9c7; border:2px solid #d8a468; border-radius:12px; padding:10px; text-align:left; }
@@ -56,6 +57,31 @@
   .shopItem.sold { opacity:.45; }
   .tkt { color:#1d8fb0; font-weight:bold; }
   #muteBtn { position:absolute; top:max(10px,env(safe-area-inset-top)); right:max(10px,env(safe-area-inset-right)); z-index:12; width:40px; height:40px; border-radius:50%; border:2px solid #b3592b; background:rgba(255,243,221,.9); color:#5a341c; cursor:pointer; font-size:16px; touch-action:manipulation; }
+
+  /* ==== 液晶（LCD）演出：スロット風の抽選ボックス ==== */
+  .lcdBox { position:relative; width:min(86%,360px); background:#1a1410; border:10px solid #3a2a18; border-radius:22px; padding:18px 16px 22px; text-align:center; box-shadow:0 14px 60px rgba(0,0,0,.8), inset 0 0 0 3px #6b4a2a; }
+  .lcdBox.jp { border-color:#5a1a10; box-shadow:0 14px 60px rgba(0,0,0,.85), inset 0 0 0 3px #b3592b; }
+  .lcdLights { position:absolute; inset:-10px; border-radius:22px; pointer-events:none; background:
+      radial-gradient(circle 5px at 6% 8%, #ffe08a, transparent 60%),
+      radial-gradient(circle 5px at 20% 4%, #ff8a8a, transparent 60%),
+      radial-gradient(circle 5px at 36% 8%, #8affb0, transparent 60%),
+      radial-gradient(circle 5px at 52% 4%, #8ac8ff, transparent 60%),
+      radial-gradient(circle 5px at 68% 8%, #ffe08a, transparent 60%),
+      radial-gradient(circle 5px at 84% 4%, #ff8a8a, transparent 60%),
+      radial-gradient(circle 5px at 96% 8%, #8affb0, transparent 60%),
+      radial-gradient(circle 5px at 6% 92%, #8ac8ff, transparent 60%),
+      radial-gradient(circle 5px at 30% 96%, #ffe08a, transparent 60%),
+      radial-gradient(circle 5px at 54% 92%, #ff8a8a, transparent 60%),
+      radial-gradient(circle 5px at 78% 96%, #8affb0, transparent 60%),
+      radial-gradient(circle 5px at 96% 92%, #8ac8ff, transparent 60%);
+    animation: lcdBlink 0.7s steps(2) infinite; }
+  @keyframes lcdBlink { 0%,100%{opacity:1;} 50%{opacity:.3;} }
+  .lcdTitle { color:#ffd94d; font-weight:900; font-size:16px; letter-spacing:1px; text-shadow:0 0 8px rgba(255,217,77,.7); margin-bottom:12px; }
+  .lcdTitle.jp { color:#ff8a5c; text-shadow:0 0 10px rgba(255,138,92,.8); font-size:19px; }
+  .lcdReels { display:flex; gap:8px; justify-content:center; background:#050403; border-radius:10px; padding:10px; box-shadow:inset 0 0 14px rgba(0,0,0,.9); }
+  .lcdReel { width:64px; height:64px; background:#0d0b08; border:2px solid #3a2a18; border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:34px; overflow:hidden; }
+  .lcdReel.big { width:100%; height:80px; font-size:26px; font-weight:900; color:#ffd94d; }
+  .lcdResult { margin-top:14px; min-height:28px; font-size:18px; font-weight:900; color:#7dffb0; text-shadow:0 0 8px rgba(125,255,176,.6); }
 
   /* ==== スマホ・タブレット向けレイアウト（縦画面：筐体を上、パネルを下にスタック） ==== */
   @media (max-width:960px){
@@ -97,11 +123,12 @@
         <p style="margin-top:10px">クリック / タップでたぬきコインを投入！<br>
         プッシャーでコインを押し出し、<b style="color:#27ae60">スコアゾーン</b>に落とそう。<br><br>
         短時間に連続で落とすと <b style="color:#e67e22">コンボ</b> 発生で倍率アップ！<br>
-        目標スコアを達成するとラウンドクリア。<br>
-        獲得した<span class="tkt">チケット</span>でショップの特殊コインや強化を買って、<br>
-        どこまでラウンドを進められるか挑戦だ。<br><br>
+        獲得した<span class="tkt">チケット</span>でショップの特殊コインや強化を買おう。<br><br>
         <span style="color:#a06a40;font-size:12px">キー 1〜7 でコイン切替 ／ 長押しで連続投入</span></p>
-        <button class="bigbtn" id="startBtn">ゲームスタート</button>
+        <button class="bigbtn" id="startStageBtn">🏆 ステージモード</button>
+        <div style="font-size:11px;color:#a06a40;margin-top:4px">目標スコアを達成してラウンドを進めていく</div>
+        <button class="bigbtn alt" id="startEndlessBtn">♾️ エンドレスモード</button>
+        <div style="font-size:11px;color:#a06a40;margin-top:4px">ラウンドなし。中央ゾーンで液晶抽選→玉3個でJPチャレンジ！</div>
       </div>
     </div>
     <div class="overlay" id="shopOv" style="display:none">
@@ -119,14 +146,38 @@
         <button class="bigbtn" id="retryBtn">もう一度挑戦</button>
       </div>
     </div>
+    <div class="overlay" id="slotOv" style="display:none">
+      <div class="lcdBox">
+        <div class="lcdLights"></div>
+        <div class="lcdTitle">🎰 液晶チャンス 🎰</div>
+        <div class="lcdReels">
+          <div class="lcdReel" id="reel0"></div>
+          <div class="lcdReel" id="reel1"></div>
+          <div class="lcdReel" id="reel2"></div>
+        </div>
+        <div class="lcdResult" id="slotResult">&nbsp;</div>
+      </div>
+    </div>
+    <div class="overlay" id="jpOv" style="display:none">
+      <div class="lcdBox jp">
+        <div class="lcdLights"></div>
+        <div class="lcdTitle jp">🎉 JP CHALLENGE 🎉</div>
+        <div class="lcdReels">
+          <div class="lcdReel big" id="jpReel"></div>
+        </div>
+        <div class="lcdResult" id="jpResult">&nbsp;</div>
+      </div>
+    </div>
   </div>
   <div id="side">
     <div class="panel">
-      <div class="stat"><span class="sub">ラウンド</span><b id="uiRound">1</b></div>
-      <div class="stat"><span class="sub">スコア / 目標</span><b><span id="uiScore">0</span><span style="font-size:13px;color:#8a5a3a"> / <span id="uiTarget">100</span></span></b></div>
+      <div class="stat" id="rowRound"><span class="sub">ラウンド</span><b id="uiRound">1</b></div>
+      <div class="stat" id="rowScoreTarget"><span class="sub">スコア / 目標</span><b><span id="uiScore">0</span><span style="font-size:13px;color:#8a5a3a"> / <span id="uiTarget">100</span></span></b></div>
       <div id="progWrap"><div id="prog"></div></div>
+      <div class="stat" id="rowScoreEndless" style="display:none"><span class="sub">累計スコア</span><b id="uiScoreEndless" style="color:#3498db">0</b></div>
       <div class="stat" style="margin-top:8px"><span class="sub">チケット</span><b style="color:#1d8fb0" id="uiTkt">0</b></div>
       <div class="stat"><span class="sub">残りコイン</span><b id="uiStock">30</b></div>
+      <div class="stat" id="rowBalls" style="display:none"><span class="sub">🔵 JPボール</span><b id="uiBalls" style="color:#3498db;letter-spacing:3px">○○○</b></div>
     </div>
     <div class="panel">
       <div style="font-size:12px;color:#8a5a3a;margin-bottom:8px">投入コイン選択</div>
@@ -137,7 +188,8 @@
       <div id="miniShop"></div>
     </div>
     <div class="panel hint">
-      💡 <b>スコアゾーン</b>（緑）に落とすと得点＋チケット。中央の <b style="color:#e67e22">×3</b> はボーナス！ 端の赤いゾーンはロスト。<br>
+      💡 <b>スコアゾーン</b>（緑）に落とすと得点＋チケット。端の赤いゾーンはロスト。<br>
+      中央ゾーンは<b style="color:#e67e22">ステージモードで×3ボーナス</b>／<b style="color:#3498db">エンドレスモードで液晶抽選</b>！<br>
       💣 ボムは着地後に爆発して周囲を吹き飛ばす。🐰 ウサギは自分で跳ねて前進、🧲 マグネットは周囲を引き寄せる。
     </div>
   </div>
@@ -208,8 +260,17 @@ function pusherFront(t){
   return PUSH_MIN+(PUSH_MAX-PUSH_MIN)*(0.5-0.5*Math.cos(t*spd));
 }
 function droppable(){ return S.stock+ORDER.slice(1).reduce((a,k)=>a+S.inv[k],0); }
-function newGame(){
+function applyModeUI(){
+  const stage=S.mode==="stage";
+  document.getElementById("rowRound").style.display=stage?"":"none";
+  document.getElementById("rowScoreTarget").style.display=stage?"":"none";
+  document.getElementById("progWrap").style.display=stage?"":"none";
+  document.getElementById("rowScoreEndless").style.display=stage?"none":"";
+  document.getElementById("rowBalls").style.display=stage?"none":"";
+}
+function newGame(mode){
   S={
+    mode: mode||"stage",
     phase:"play", round:1, score:0, target:targetFor(1),
     tickets:0, stock:30, inv:{gold:0,bomb:1,rabbit:0,magnet:0,big:0,split:0},
     sel:"normal", coins:[], parts:[], floats:[],
@@ -217,7 +278,9 @@ function newGame(){
     dropCd:0, outT:-1, aimX:CX,
     up:{zone:0,combo:0,ticket:0,speed:0,stock:0},
     totalScore:0, warmup:false, warmFell:0,
+    balls:0, busy:false, towerLeft:0, towerTimer:0,
   };
+  applyModeUI();
   // 台を飽和密度で敷き詰める（隙間があると押し出しが発生しない）
   for(let row=0;row<12;row++){
     const y=255+row*27;
@@ -242,7 +305,7 @@ function newGame(){
 
 /* ================= 投入 ================= */
 function tryDrop(x){
-  if(!S||S.phase!=="play"||S.dropCd>0) return;
+  if(!S||S.phase!=="play"||S.busy||S.dropCd>0) return;
   let type=S.sel;
   if(type==="normal"){ if(S.stock<=0){ autoSelect(); return; } S.stock--; }
   else { if(S.inv[type]<=0){ S.sel="normal"; refreshUI(); return; } S.inv[type]--; }
@@ -269,7 +332,8 @@ function coinFalls(c){
     S.combo++; S.comboT=2.0+S.up.combo*0.6;
     let mult=1+(S.combo-1)*0.25;
     const jp=(c.x>=z.jL&&c.x<=z.jR);
-    if(jp) mult*=3;
+    const slotTrigger=jp&&S.mode==="endless"&&!S.busy;
+    if(jp&&!slotTrigger) mult*=3;   // ステージモードは従来通り即×3
     const pts=Math.round(c.d.value*mult);
     S.score+=pts; S.totalScore+=pts;
     const tk=c.d.ticket+S.up.ticket;
@@ -279,7 +343,8 @@ function coinFalls(c){
     burst3D(c.x,FRONT,jp?0xffd94d:0x7dffb0,jp?26:12);
     jp?SND.jp():SND.score(S.combo);
     c.fallZone="score";
-    if(S.score>=S.target) setTimeout(roundClear,600);
+    if(S.mode==="stage"&&S.score>=S.target) setTimeout(roundClear,600);
+    if(slotTrigger) setTimeout(triggerSlot,350);
   }else{
     addFloat(c.x,"ロスト","#c9a98a");
     SND.lost();
@@ -313,6 +378,19 @@ function update(dt){
   if(S.shake>0) S.shake=Math.max(0,S.shake-40*dt);
 
   if(S.phase!=="play"&&!S.warmup){ updateFx(dt); return; }
+
+  // JP当選後の「メダルタワー崩し」演出：コインを少しずつ奥から降らせる
+  if(S.towerLeft>0){
+    S.towerTimer-=dt;
+    if(S.towerTimer<=0){
+      S.towerTimer=0.045;
+      const n=Math.min(3,S.towerLeft);
+      for(let i=0;i<n;i++){
+        S.coins.push(mkCoin("normal", WALL_L+30+Math.random()*(WALL_R-WALL_L-60), BACK+15+Math.random()*50, 1));
+      }
+      S.towerLeft-=n;
+    }
+  }
 
   const damp=Math.max(0,1-5.5*dt);
   for(const c of S.coins){
@@ -446,6 +524,95 @@ function updateMiniShop(){
     btn.disabled=!S||S.phase!=="play"||S.tickets<item.cost;
   }
 }
+/* ================= 液晶抽選・JPチャレンジ（エンドレスモード専用） ================= */
+const SLOT_SYMS=["🍒","🔔","⭐","💎","🔵"];
+function spinReelEl(el,finalSym,delay,duration){
+  return new Promise(resolve=>{
+    const start=performance.now()+delay;
+    const iv=setInterval(()=>{
+      if(performance.now()<start) return;
+      el.textContent=SLOT_SYMS[Math.floor(Math.random()*SLOT_SYMS.length)];
+    },60);
+    setTimeout(()=>{ clearInterval(iv); el.textContent=finalSym; resolve(); }, delay+duration);
+  });
+}
+function triggerSlot(){
+  if(!S||S.mode!=="endless"||S.busy) return;
+  S.busy=true;
+  const roll=Math.random();
+  let outcome,syms;
+  if(roll<0.05){ outcome="mid";   syms=["💎","💎","💎"]; }
+  else if(roll<0.20){ outcome="ball";  syms=["🔵","🔵","🔵"]; }
+  else if(roll<0.45){ outcome="small"; syms=["🍒","🍒","🍒"]; }
+  else { outcome="miss"; syms=["🍒","🔔","⭐"]; }
+  const ov=document.getElementById("slotOv");
+  const resultEl=document.getElementById("slotResult");
+  resultEl.textContent="";
+  ov.style.display="flex";
+  const reels=[document.getElementById("reel0"),document.getElementById("reel1"),document.getElementById("reel2")];
+  Promise.all(reels.map((el,i)=>spinReelEl(el,syms[i],i*260,500))).then(()=>{
+    let msg="",col="#c9a98a";
+    if(outcome==="miss"){ msg="残念…"; col="#c9a98a"; SND.lost(); }
+    else if(outcome==="small"){ msg="🍒 小当たり！ボーナス！"; col="#ffd94d"; SND.jp(); }
+    else if(outcome==="ball"){ msg="🔵 JPボール獲得！"; col="#3498db"; SND.jp(); }
+    else if(outcome==="mid"){ msg="💎 中当たり！"; col="#ff8a5c"; SND.jp(); }
+    resultEl.textContent=msg; resultEl.style.color=col;
+    resolveSlotOutcome(outcome);
+    setTimeout(()=>{
+      ov.style.display="none";
+      S.busy=false;
+      if(outcome==="ball"&&S.balls>=3) setTimeout(triggerJP,300);
+    },1100);
+  });
+}
+function resolveSlotOutcome(outcome){
+  if(outcome==="small"){
+    const bonus=30+Math.floor(Math.random()*20);
+    S.score+=bonus; S.totalScore+=bonus; S.tickets+=3;
+    addFloat(CX,"+"+bonus,"#ffd94d",true);
+  }else if(outcome==="mid"){
+    const bonus=100+Math.floor(Math.random()*60);
+    S.score+=bonus; S.totalScore+=bonus; S.tickets+=8;
+    addFloat(CX,"+"+bonus,"#ff8a5c",true);
+  }else if(outcome==="ball"){
+    S.balls=Math.min(3,S.balls+1);
+  }
+  refreshUI(); sbDirty=true;
+}
+function triggerJP(){
+  if(!S||S.busy) return;
+  S.balls=0; S.busy=true; refreshUI();
+  const ov=document.getElementById("jpOv");
+  const resultEl=document.getElementById("jpResult");
+  const reel=document.getElementById("jpReel");
+  resultEl.textContent="";
+  ov.style.display="flex";
+  const win=Math.random()<0.4;
+  const labels=["777","JACKPOT","はずれ","BIG","チャンス"];
+  const iv=setInterval(()=>{ reel.textContent=labels[Math.floor(Math.random()*labels.length)]; },70);
+  setTimeout(()=>{
+    clearInterval(iv);
+    if(win){
+      reel.textContent="🎉 JACKPOT 🎉";
+      const bonus=5000+Math.floor(Math.random()*3000);
+      S.score+=bonus; S.totalScore+=bonus; S.tickets+=80;
+      resultEl.textContent=`メダルタワー崩し！ +${bonus.toLocaleString()}`;
+      resultEl.style.color="#ffd94d";
+      SND.clear();
+      spawnMedalTower();
+    }else{
+      reel.textContent="残念…";
+      resultEl.textContent="また玉を3つ集めよう！";
+      resultEl.style.color="#c9a98a";
+      SND.over();
+    }
+    refreshUI(); sbDirty=true;
+    setTimeout(()=>{ ov.style.display="none"; S.busy=false; },1800);
+  },1800);
+}
+function spawnMedalTower(){
+  S.towerLeft=70; S.towerTimer=0;
+}
 function roundClear(){
   if(!S||S.phase!=="play"||S.score<S.target) return;
   S.phase="shop"; S.outT=-1;
@@ -489,10 +656,12 @@ function nextRound(){
 }
 function gameOver(){
   S.phase="over"; SND.over();
-  document.getElementById("overText").innerHTML=
-    `到達ラウンド：<b style="color:#c0392b;font-size:20px">${S.round}</b><br>`+
-    `このラウンドのスコア：${S.score} / ${S.target}<br>`+
-    `累計スコア：<b style="color:#27ae60">${S.totalScore}</b>`;
+  document.getElementById("overText").innerHTML = S.mode==="stage"
+    ? `到達ラウンド：<b style="color:#c0392b;font-size:20px">${S.round}</b><br>`+
+      `このラウンドのスコア：${S.score} / ${S.target}<br>`+
+      `累計スコア：<b style="color:#27ae60">${S.totalScore}</b>`
+    : `累計スコア：<b style="color:#3498db;font-size:22px">${S.totalScore.toLocaleString()}</b><br>`+
+      `獲得チケット：<b style="color:#1d8fb0">${S.tickets}</b>`;
   document.getElementById("overOv").style.display="flex";
   updateMiniShop();
 }
@@ -911,6 +1080,10 @@ function refreshUI(){
   document.getElementById("uiTkt").textContent=S.tickets;
   document.getElementById("uiStock").textContent=S.stock;
   document.getElementById("prog").style.width=Math.min(100,S.score/S.target*100)+"%";
+  if(S.mode==="endless"){
+    document.getElementById("uiScoreEndless").textContent=S.totalScore.toLocaleString();
+    document.getElementById("uiBalls").textContent="●".repeat(S.balls)+"○".repeat(3-S.balls);
+  }
   for(const k of ORDER){
     const b=btnEls[k];
     const n=k==="normal"?S.stock:S.inv[k];
@@ -984,16 +1157,22 @@ window.addEventListener("keydown",e=>{
   if(k){ const n=k==="normal"?S.stock:S.inv[k]; if(n>0){ S.sel=k; refreshUI(); } }
   if(e.key===" "){ e.preventDefault(); tryDrop(S.aimX); }
 });
-document.getElementById("startBtn").onclick=()=>{
+document.getElementById("startStageBtn").onclick=()=>{
   ensureAC();
   document.getElementById("titleOv").style.display="none";
-  newGame();
+  newGame("stage");
+  buildZoneStrips();
+};
+document.getElementById("startEndlessBtn").onclick=()=>{
+  ensureAC();
+  document.getElementById("titleOv").style.display="none";
+  newGame("endless");
   buildZoneStrips();
 };
 document.getElementById("nextBtn").onclick=nextRound;
 document.getElementById("retryBtn").onclick=()=>{
   document.getElementById("overOv").style.display="none";
-  newGame();
+  newGame(S.mode);
   buildZoneStrips();
 };
 document.getElementById("muteBtn").onclick=function(){
@@ -1046,6 +1225,7 @@ drawScoreboard();
 
 // 検証用フック
 window.__g={ get S(){return S}, update, tryDrop, render3D, pusherFront, newGame, resize,
+  triggerSlot, triggerJP, spawnMedalTower,
   get renderer(){return renderer}, get scene(){return scene}, get camera(){return camera},
   isMobile, THREE };
 </script>
