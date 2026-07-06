@@ -28,6 +28,11 @@
   #progWrap { height:12px; background:#e8d3b5; border-radius:6px; overflow:hidden; margin-top:6px; border:1px solid #b3592b; }
   #prog { height:100%; width:0%; background:linear-gradient(90deg,#f39c12,#e74c3c); transition:width .2s; }
   #coinBtns { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  #miniShop { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .mbtn { position:relative; padding:6px 22px 6px 7px; background:#ffe9c7; border:2px solid #d8a468; border-radius:10px; cursor:pointer; font-size:11.5px; color:#5a341c; text-align:left; font-family:inherit; touch-action:manipulation; }
+  @media (hover:hover) and (pointer:fine){ .mbtn:hover:not(:disabled) { background:#ffdda6; } }
+  .mbtn:disabled { opacity:.35; cursor:not-allowed; }
+  .mbtn .cost { position:absolute; right:6px; bottom:5px; font-size:10px; color:#1d8fb0; font-weight:bold; }
   .cbtn { position:relative; display:flex; align-items:center; gap:8px; padding:7px 8px; min-height:44px; background:#ffe9c7; border:2px solid #d8a468; border-radius:10px; cursor:pointer; font-size:13px; color:#5a341c; text-align:left; touch-action:manipulation; }
   @media (hover:hover) and (pointer:fine){ .cbtn:hover { background:#ffdda6; } }
   .cbtn.sel { border-color:#c0392b; background:#ffd28a; box-shadow:0 0 0 2px rgba(192,57,43,.35); }
@@ -126,6 +131,10 @@
     <div class="panel">
       <div style="font-size:12px;color:#8a5a3a;margin-bottom:8px">投入コイン選択</div>
       <div id="coinBtns"></div>
+    </div>
+    <div class="panel">
+      <div style="font-size:12px;color:#8a5a3a;margin-bottom:8px">🎫 チケットでコイン購入（プレイ中いつでも）</div>
+      <div id="miniShop"></div>
     </div>
     <div class="panel hint">
       💡 <b>スコアゾーン</b>（緑）に落とすと得点＋チケット。中央の <b style="color:#e67e22">×3</b> はボーナス！ 端の赤いゾーンはロスト。<br>
@@ -410,6 +419,33 @@ const SHOP_POOL=[
   {id:"speed",   nm:"プッシャー加速",  ds:"プッシャーの動きが速くなる (最大3)",      cost:9,  can:()=>S.up.speed<3,   fn:()=>S.up.speed++},
   {id:"stock",   nm:"補給強化",        ds:"毎ラウンド開始時のコイン +12 (最大3)",    cost:12, can:()=>S.up.stock<3,   fn:()=>S.up.stock++},
 ];
+// プレイ中いつでもチケットでコインを購入できるミニショップ（アイテムはSHOP_POOLのコイン系のみ・回数無制限）
+const COIN_SHOP_IDS=["coins15","coins40","gold3","bomb2","rabbit3","magnet2","big2","split3"];
+const COIN_SHOP=SHOP_POOL.filter(it=>COIN_SHOP_IDS.includes(it.id));
+const miniBtns=[];
+function buildMiniShop(){
+  const wrap=document.getElementById("miniShop");
+  for(const it of COIN_SHOP){
+    const b=document.createElement("button");
+    b.className="mbtn";
+    b.disabled=true;
+    b.innerHTML=`${it.nm}<span class="cost">🎫${it.cost}</span>`;
+    b.title=it.ds;
+    b.onclick=()=>{
+      if(!S||S.phase!=="play"||S.tickets<it.cost) return;
+      S.tickets-=it.cost; it.fn(); SND.buy();
+      refreshUI();
+    };
+    miniBtns.push({btn:b,item:it});
+    wrap.appendChild(b);
+  }
+}
+buildMiniShop();
+function updateMiniShop(){
+  for(const {btn,item} of miniBtns){
+    btn.disabled=!S||S.phase!=="play"||S.tickets<item.cost;
+  }
+}
 function roundClear(){
   if(!S||S.phase!=="play"||S.score<S.target) return;
   S.phase="shop"; S.outT=-1;
@@ -458,6 +494,7 @@ function gameOver(){
     `このラウンドのスコア：${S.score} / ${S.target}<br>`+
     `累計スコア：<b style="color:#27ae60">${S.totalScore}</b>`;
   document.getElementById("overOv").style.display="flex";
+  updateMiniShop();
 }
 
 /* ================= 3D 描画 ================= */
@@ -881,6 +918,7 @@ function refreshUI(){
     b.classList.toggle("sel",S.sel===k);
     b.classList.toggle("empty",n<=0);
   }
+  updateMiniShop();
 }
 const btnEls={};
 function buildCoinBtns(){
