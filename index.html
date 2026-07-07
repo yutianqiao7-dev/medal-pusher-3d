@@ -178,6 +178,7 @@
       <div class="stat" style="margin-top:8px"><span class="sub">チケット</span><b style="color:#1d8fb0" id="uiTkt">0</b></div>
       <div class="stat"><span class="sub">残りコイン</span><b id="uiStock">30</b></div>
       <div class="stat" id="rowBalls" style="display:none"><span class="sub">🔵 JPボール</span><b id="uiBalls" style="color:#3498db;letter-spacing:3px">○○○</b></div>
+      <div class="stat" id="rowQueue" style="display:none"><span class="sub">🎰 液晶保留</span><b id="uiQueue" style="color:#e67e22;letter-spacing:3px">○○○</b></div>
     </div>
     <div class="panel">
       <div style="font-size:12px;color:#8a5a3a;margin-bottom:8px">投入コイン選択</div>
@@ -267,6 +268,7 @@ function applyModeUI(){
   document.getElementById("progWrap").style.display=stage?"":"none";
   document.getElementById("rowScoreEndless").style.display=stage?"none":"";
   document.getElementById("rowBalls").style.display=stage?"none":"";
+  document.getElementById("rowQueue").style.display=stage?"none":"";
 }
 function newGame(mode){
   S={
@@ -279,6 +281,7 @@ function newGame(mode){
     up:{zone:0,combo:0,ticket:0,speed:0,stock:0},
     totalScore:0, warmup:false, warmFell:0,
     balls:0, busy:false, towerLeft:0, towerTimer:0,
+    slotQueue:0, rainLeft:0, rainTimer:0,
   };
   applyModeUI();
   // 台を飽和密度で敷き詰める（隙間があると押し出しが発生しない）
@@ -332,8 +335,8 @@ function coinFalls(c){
     S.combo++; S.comboT=2.0+S.up.combo*0.6;
     let mult=1+(S.combo-1)*0.25;
     const jp=(c.x>=z.jL&&c.x<=z.jR);
-    const slotTrigger=jp&&S.mode==="endless"&&!S.busy;
-    if(jp&&!slotTrigger) mult*=3;   // ステージモードは従来通り即×3
+    const queueThis=jp&&S.mode==="endless";
+    if(jp&&!queueThis) mult*=3;   // ステージモードは従来通り即×3
     const pts=Math.round(c.d.value*mult);
     S.score+=pts; S.totalScore+=pts;
     const tk=c.d.ticket+S.up.ticket;
@@ -344,7 +347,11 @@ function coinFalls(c){
     jp?SND.jp():SND.score(S.combo);
     c.fallZone="score";
     if(S.mode==="stage"&&S.score>=S.target) setTimeout(roundClear,600);
-    if(slotTrigger) setTimeout(triggerSlot,350);
+    if(queueThis&&S.slotQueue<3){
+      S.slotQueue++;
+      addFloat(c.x,"保留+1","#e67e22",false,34);
+      setTimeout(processSlotQueue,350);
+    }
   }else{
     addFloat(c.x,"ロスト","#c9a98a");
     SND.lost();
@@ -389,6 +396,18 @@ function update(dt){
         S.coins.push(mkCoin("normal", WALL_L+30+Math.random()*(WALL_R-WALL_L-60), BACK+15+Math.random()*50, 1));
       }
       S.towerLeft-=n;
+    }
+  }
+  // 液晶抽選の小当たり・中当たり演出：いつもの投入エリア付近にコインを1枚ずつ降らせる
+  if(S.rainLeft>0){
+    S.rainTimer-=dt;
+    if(S.rainTimer<=0){
+      S.rainTimer=0.09;
+      const x=Math.max(WALL_L+20,Math.min(WALL_R-20,CX+(Math.random()-0.5)*160));
+      const c=mkCoin("normal", x, DROP_Y, 1);
+      c.state="drop"; c.dropT=0.32;
+      S.coins.push(c);
+      S.rainLeft--;
     }
   }
 
@@ -536,14 +555,21 @@ function spinReelEl(el,finalSym,delay,duration){
     setTimeout(()=>{ clearInterval(iv); el.textContent=finalSym; resolve(); }, delay+duration);
   });
 }
+function processSlotQueue(){
+  if(!S||S.mode!=="endless"||S.busy||S.slotQueue<=0) return;
+  S.slotQueue--;
+  refreshUI();
+  triggerSlot();
+}
 function triggerSlot(){
   if(!S||S.mode!=="endless"||S.busy) return;
   S.busy=true;
   const roll=Math.random();
   let outcome,syms;
+  // ボール当選率 約1/10。中当たり5%・小当たり25%・残りハズレ
   if(roll<0.05){ outcome="mid";   syms=["💎","💎","💎"]; }
-  else if(roll<0.20){ outcome="ball";  syms=["🔵","🔵","🔵"]; }
-  else if(roll<0.45){ outcome="small"; syms=["🍒","🍒","🍒"]; }
+  else if(roll<0.15){ outcome="ball";  syms=["🔵","🔵","🔵"]; }
+  else if(roll<0.40){ outcome="small"; syms=["🍒","🍒","🍒"]; }
   else { outcome="miss"; syms=["🍒","🔔","⭐"]; }
   const ov=document.getElementById("slotOv");
   const resultEl=document.getElementById("slotResult");
@@ -553,27 +579,26 @@ function triggerSlot(){
   Promise.all(reels.map((el,i)=>spinReelEl(el,syms[i],i*260,500))).then(()=>{
     let msg="",col="#c9a98a";
     if(outcome==="miss"){ msg="残念…"; col="#c9a98a"; SND.lost(); }
-    else if(outcome==="small"){ msg="🍒 小当たり！ボーナス！"; col="#ffd94d"; SND.jp(); }
+    else if(outcome==="small"){ msg="🍒 小当たり！コイン10枚！"; col="#ffd94d"; SND.jp(); }
     else if(outcome==="ball"){ msg="🔵 JPボール獲得！"; col="#3498db"; SND.jp(); }
-    else if(outcome==="mid"){ msg="💎 中当たり！"; col="#ff8a5c"; SND.jp(); }
+    else if(outcome==="mid"){ msg="💎 中当たり！コイン30枚！"; col="#ff8a5c"; SND.jp(); }
     resultEl.textContent=msg; resultEl.style.color=col;
     resolveSlotOutcome(outcome);
     setTimeout(()=>{
       ov.style.display="none";
       S.busy=false;
       if(outcome==="ball"&&S.balls>=3) setTimeout(triggerJP,300);
+      else setTimeout(processSlotQueue,250);
     },1100);
   });
 }
 function resolveSlotOutcome(outcome){
   if(outcome==="small"){
-    const bonus=30+Math.floor(Math.random()*20);
-    S.score+=bonus; S.totalScore+=bonus; S.tickets+=3;
-    addFloat(CX,"+"+bonus,"#ffd94d",true);
+    spawnCoinRain(10);
+    addFloat(CX,"コイン+10枚!","#ffd94d",true);
   }else if(outcome==="mid"){
-    const bonus=100+Math.floor(Math.random()*60);
-    S.score+=bonus; S.totalScore+=bonus; S.tickets+=8;
-    addFloat(CX,"+"+bonus,"#ff8a5c",true);
+    spawnCoinRain(30);
+    addFloat(CX,"コイン+30枚!!","#ff8a5c",true);
   }else if(outcome==="ball"){
     S.balls=Math.min(3,S.balls+1);
   }
@@ -607,11 +632,14 @@ function triggerJP(){
       SND.over();
     }
     refreshUI(); sbDirty=true;
-    setTimeout(()=>{ ov.style.display="none"; S.busy=false; },1800);
+    setTimeout(()=>{ ov.style.display="none"; S.busy=false; setTimeout(processSlotQueue,250); },1800);
   },1800);
 }
 function spawnMedalTower(){
   S.towerLeft=70; S.towerTimer=0;
+}
+function spawnCoinRain(n){
+  S.rainLeft=(S.rainLeft||0)+n;
 }
 function roundClear(){
   if(!S||S.phase!=="play"||S.score<S.target) return;
@@ -1083,6 +1111,7 @@ function refreshUI(){
   if(S.mode==="endless"){
     document.getElementById("uiScoreEndless").textContent=S.totalScore.toLocaleString();
     document.getElementById("uiBalls").textContent="●".repeat(S.balls)+"○".repeat(3-S.balls);
+    document.getElementById("uiQueue").textContent="●".repeat(S.slotQueue)+"○".repeat(3-S.slotQueue);
   }
   for(const k of ORDER){
     const b=btnEls[k];
@@ -1225,7 +1254,7 @@ drawScoreboard();
 
 // 検証用フック
 window.__g={ get S(){return S}, update, tryDrop, render3D, pusherFront, newGame, resize,
-  triggerSlot, triggerJP, spawnMedalTower,
+  triggerSlot, triggerJP, spawnMedalTower, spawnCoinRain, processSlotQueue,
   get renderer(){return renderer}, get scene(){return scene}, get camera(){return camera},
   isMobile, THREE };
 </script>
