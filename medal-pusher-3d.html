@@ -463,14 +463,21 @@ function update(dt){
 
   if(S.phase!=="play"&&!S.warmup){ updateFx(dt); return; }
 
-  // JP当選後の「メダルタワー崩し」演出：コインを少しずつ奥から降らせる
+  // JP当選後の「メダルタワー崩し」演出：スコアゾーン手前にコインを降らせて、そのまま雪崩れ落とす
+  // （奥から入れると密集した山を何分も押し出す必要があり実質もらえないため、前方に直接投下する）
   if(S.towerLeft>0){
     S.towerTimer-=dt;
     if(S.towerTimer<=0){
-      S.towerTimer=0.045;
+      S.towerTimer=0.06;
       const n=Math.min(3,S.towerLeft);
       for(let i=0;i<n;i++){
-        S.coins.push(mkCoin("normal", WALL_L+30+Math.random()*(WALL_R-WALL_L-60), BACK+15+Math.random()*50, 1));
+        const x=WALL_L+20+Math.random()*(WALL_R-WALL_L-40);
+        const y=380+Math.random()*140;
+        const c=mkCoin("normal", x, y, 2);
+        c.state="drop"; c.dropT=0.28+Math.random()*0.15;
+        c.vy=200+Math.random()*120;      // 着地後すぐ前方へ押し出されるよう初速を持たせる
+        c.vx=(Math.random()-0.5)*60;
+        S.coins.push(c);
       }
       S.towerLeft-=n;
     }
@@ -701,7 +708,7 @@ function spawnBall(){
   S.coins.push(c);
 }
 function spawnMedalTower(){
-  S.towerLeft=70; S.towerTimer=0;
+  S.towerLeft=90; S.towerTimer=0;
 }
 // コインの雨：種類ごとにキューへ積み、いつもの投入エリア付近から1枚ずつ降らせる
 function spawnTypedRain(type,n){
