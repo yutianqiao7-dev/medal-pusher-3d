@@ -57,6 +57,8 @@
   .shopItem.sold { opacity:.45; }
   .tkt { color:#1d8fb0; font-weight:bold; }
   #muteBtn { position:absolute; top:max(10px,env(safe-area-inset-top)); right:max(10px,env(safe-area-inset-right)); z-index:12; width:40px; height:40px; border-radius:50%; border:2px solid #b3592b; background:rgba(255,243,221,.9); color:#5a341c; cursor:pointer; font-size:16px; touch-action:manipulation; }
+  #adminBtn { position:absolute; top:max(10px,env(safe-area-inset-top)); right:calc(max(10px,env(safe-area-inset-right)) + 48px); z-index:12; width:40px; height:40px; border-radius:50%; border:2px solid #6a6a6a; background:rgba(230,230,230,.55); color:#4a4a4a; cursor:pointer; font-size:15px; opacity:.5; touch-action:manipulation; }
+  @media (hover:hover) and (pointer:fine){ #adminBtn:hover{ opacity:1; } }
 
   /* ==== 液晶（LCD）演出：スロット風の抽選ボックス ==== */
   .lcdBox { position:relative; width:min(86%,360px); background:#1a1410; border:10px solid #3a2a18; border-radius:22px; padding:18px 16px 22px; text-align:center; box-shadow:0 14px 60px rgba(0,0,0,.8), inset 0 0 0 3px #6b4a2a; }
@@ -115,6 +117,7 @@
     <div id="comboBox"><div class="c1"></div><div class="c2"></div></div>
     <div id="warnBox"></div>
     <button id="muteBtn" title="サウンド切替">🔊</button>
+    <button id="adminBtn" title="管理者メニュー">🔧</button>
     <div class="overlay" id="titleOv">
       <div class="modal">
         <h1>🎪 メダルラッシュ<br>ローグライク 3D</h1>
@@ -245,7 +248,7 @@ function mkCoin(type,x,y,tier){
           dropT:0, fallT:0, fallZone:null, hopT:1+Math.random(), fuse:-1, spin:Math.random()*6.28};
 }
 function zones(){
-  const half=95+S.up.zone*28;
+  const half=80+S.up.zone*28;
   return {sL:Math.max(WALL_L,CX-half), sR:Math.min(WALL_R,CX+half), jL:CX-20, jR:CX+20};
 }
 function pusherFront(t){
@@ -381,21 +384,15 @@ function coinFalls(c){
   const z=zones();
   const inScore=c.x>=z.sL&&c.x<=z.sR;
 
-  // JPボール（物理オブジェクト）：スコアゾーンに落ちたら1個獲得＋毎回ルーレットで特典、外れたら消滅
+  // JPボール（物理オブジェクト）：ロストゾーンに落ちても消えず、必ず1個獲得＋ルーレットで特典
   if(c.type==="jpball"){
-    if(inScore){
-      S.balls=Math.min(3,S.balls+1);
-      addFloat(c.x,"🔵+1","#3498db",true);
-      burst3D(c.x,FRONT,0x3498db,18);
-      SND.jp();
-      c.fallZone="score";
-      pushEvent("ballRoulette");
-      if(S.balls>=3) pushEvent("jp");
-    }else{
-      addFloat(c.x,"球ロスト…","#c9a98a");
-      SND.lost();
-      c.fallZone="lost";
-    }
+    S.balls=Math.min(3,S.balls+1);
+    addFloat(c.x,"🔵+1","#3498db",true);
+    burst3D(c.x,FRONT,0x3498db,18);
+    SND.jp();
+    c.fallZone="score";
+    pushEvent("ballRoulette");
+    if(S.balls>=3) pushEvent("jp");
     refreshUI(); sbDirty=true;
     return;
   }
@@ -721,11 +718,11 @@ const BALL_ROULETTE_REWARDS=[
   {label:"コイン+10",   col:"#ffd94d", fn:()=>spawnCoinRain(10)},
   {label:"コイン+30",   col:"#ff8a5c", fn:()=>spawnCoinRain(30)},
   {label:"🔵+1",        col:"#3498db", fn:()=>spawnBall()},
-  {label:"★ゴールド",   col:"#ffe07a", fn:()=>spawnTypedRain("gold",3)},
-  {label:"💣ボム",      col:"#8f88a0", fn:()=>spawnTypedRain("bomb",2)},
-  {label:"🐰ウサギ",    col:"#ffb8d6", fn:()=>spawnTypedRain("rabbit",2)},
-  {label:"🧲マグネット", col:"#9fc0ff", fn:()=>spawnTypedRain("magnet",2)},
-  {label:"⬛ビッグ",     col:"#ffbb7a", fn:()=>spawnTypedRain("big",1)},
+  {label:"★ゴールド",   col:"#ffe07a", fn:()=>{S.inv.gold+=3;}},
+  {label:"💣ボム",      col:"#8f88a0", fn:()=>{S.inv.bomb+=2;}},
+  {label:"🐰ウサギ",    col:"#ffb8d6", fn:()=>{S.inv.rabbit+=2;}},
+  {label:"🧲マグネット", col:"#9fc0ff", fn:()=>{S.inv.magnet+=2;}},
+  {label:"⬛ビッグ",     col:"#ffbb7a", fn:()=>{S.inv.big+=1;}},
 ];
 function triggerBallRoulette(){
   if(!S||S.busy) return;
@@ -1516,6 +1513,22 @@ document.getElementById("retryBtn").onclick=()=>{
 };
 document.getElementById("muteBtn").onclick=function(){
   muted=!muted; this.textContent=muted?"🔇":"🔊";
+};
+const ADMIN_PASSWORD="medal2026";
+document.getElementById("adminBtn").onclick=()=>{
+  if(!S){ alert("先にゲームを開始してください"); return; }
+  const pw=prompt("管理者パスワードを入力してください");
+  if(pw===null) return;
+  if(pw!==ADMIN_PASSWORD){ alert("パスワードが違います"); return; }
+  const amountStr=prompt("追加するコイン枚数を入力してください","100");
+  if(amountStr===null) return;
+  const amount=parseInt(amountStr,10);
+  if(!Number.isFinite(amount)||amount<=0){ alert("正しい数値を入力してください"); return; }
+  S.stock+=amount;
+  if(S.mode==="endless") S.totalCoinsWon+=amount;
+  refreshUI(); sbDirty=true;
+  SND.buy();
+  alert(`コインを${amount}枚追加しました`);
 };
 
 /* ================= メインループ ================= */
