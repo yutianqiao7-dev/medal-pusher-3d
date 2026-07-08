@@ -125,7 +125,7 @@
         <button class="bigbtn" id="startStageBtn">🏆 ステージモード</button>
         <div style="font-size:11px;color:#a06a40;margin-top:4px">目標スコアを達成してラウンドを進め、チケットで強化を購入</div>
         <button class="bigbtn alt" id="startEndlessBtn">♾️ エンドレスモード</button>
-        <div style="font-size:11px;color:#a06a40;margin-top:4px">手前に落ちたコインがそのまま獲得に。中央ゾーンで奥のモニターが液晶抽選、玉が3つ落ちたらクルーンでJPチャレンジ！</div>
+        <div style="font-size:11px;color:#a06a40;margin-top:4px">手前に落ちたコインがそのまま獲得に。中央ゾーンで奥のモニターが液晶抽選、玉が3つ落ちたらクルーンでJPチャレンジ！進捗は自動保存され、日をまたぐとログインボーナスも！</div>
       </div>
     </div>
     <div class="overlay" id="shopOv" style="display:none">
@@ -264,6 +264,36 @@ function applyModeUI(){
   document.getElementById("rowBalls").style.display=stage?"none":"";
   document.getElementById("rowQueue").style.display=stage?"none":"";
 }
+// ================= エンドレスモードの永続化・日替わりログインボーナス =================
+const ENDLESS_SAVE_KEY="medalPusherEndlessSave_v1";
+function todayStr(){
+  const d=new Date();
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
+}
+function loadEndlessSave(){
+  try{
+    const raw=localStorage.getItem(ENDLESS_SAVE_KEY);
+    return raw?JSON.parse(raw):null;
+  }catch(e){ return null; }
+}
+function writeEndlessSave(save){
+  try{ localStorage.setItem(ENDLESS_SAVE_KEY, JSON.stringify(save)); }catch(e){}
+}
+function saveEndlessProgress(){
+  if(!S||S.mode!=="endless") return;
+  writeEndlessSave({ stock:S.stock, totalCoinsWon:S.totalCoinsWon, balls:S.balls, inv:S.inv, lastPlayDateStr:todayStr() });
+}
+// 既存セーブがある場合のみ、日付が変わっていればコインをランダムでプレゼントする
+function checkDailyBonus(save){
+  const today=todayStr();
+  if(save.lastPlayDateStr===today) return 0;
+  const bonus=[10,20,30][Math.floor(Math.random()*3)];
+  save.stock=(save.stock||0)+bonus;
+  save.lastPlayDateStr=today;
+  return bonus;
+}
+window.addEventListener("beforeunload",()=>{ if(S&&S.mode==="endless") saveEndlessProgress(); });
+
 function newGame(mode){
   S={
     mode: mode||"stage",
@@ -277,8 +307,22 @@ function newGame(mode){
     balls:0, busy:false, towerLeft:0, towerTimer:0,
     eventQueue:[], rainQueue:[], rainTimer:0,
     totalCoinsWon:0, slotAnim:null, kurun:null, ballRoulette:null,
+    pendingDailyBonus:0,
   };
   applyModeUI();
+  if(S.mode==="endless"){
+    let save=loadEndlessSave();
+    if(!save){
+      save={ stock:S.stock, totalCoinsWon:0, balls:0, inv:Object.assign({},S.inv), lastPlayDateStr:todayStr() };
+    }else{
+      S.pendingDailyBonus=checkDailyBonus(save);
+    }
+    S.stock=save.stock;
+    S.totalCoinsWon=save.totalCoinsWon||0;
+    S.balls=Math.min(3,save.balls||0);
+    Object.assign(S.inv, save.inv||{});
+    writeEndlessSave(save);
+  }
   // 台を飽和密度で敷き詰める（隙間があると押し出しが発生しない）
   for(let row=0;row<12;row++){
     const y=255+row*27;
@@ -299,6 +343,14 @@ function newGame(mode){
   S.warmup=false;
   S.parts.length=0; S.floats.length=0;
   refreshUI(); sbDirty=true;
+  if(S.pendingDailyBonus>0){
+    const bonus=S.pendingDailyBonus;
+    setTimeout(()=>{
+      if(!S||S.mode!=="endless") return;
+      addFloat(CX,`🎁ログインボーナス +${bonus}枚!`,"#ffd94d",true);
+      SND.buy();
+    },700);
+  }
 }
 
 /* ================= 投入 ================= */
@@ -1136,8 +1188,8 @@ function drawSlotOnBoard(c,sa){
   }
 }
 {
-  const backTower=box(TABLE_W+4.5, 15, 1.2, stripeMat);
-  backTower.position.set(0, 5.6, Z_BACK-1.6);
+  const backTower=box(TABLE_W+4.5, 9, 1.2, stripeMat);
+  backTower.position.set(0, 3.15, Z_BACK-1.6);   // モニター(y=3.3)に合わせて低めにし、画角上端で見切れないようにする
   world.add(backTower);
   const sb=new THREE.Mesh(new THREE.PlaneGeometry(16.5, 7.2),
     new THREE.MeshBasicMaterial({map:sbTex}));
@@ -1371,6 +1423,7 @@ function refreshUI(){
     b.classList.toggle("empty",n<=0);
   }
   updateMiniShop();
+  if(S.mode==="endless") saveEndlessProgress();
 }
 const btnEls={};
 function buildCoinBtns(){
@@ -1506,6 +1559,7 @@ drawScoreboard();
 window.__g={ get S(){return S}, update, tryDrop, render3D, pusherFront, newGame, resize,
   triggerSlot, triggerJP, triggerBallRoulette, spawnMedalTower, spawnCoinRain, spawnTypedRain,
   pushEvent, processEventQueue, spawnBall,
+  loadEndlessSave, writeEndlessSave, saveEndlessProgress, checkDailyBonus, todayStr, ENDLESS_SAVE_KEY,
   get renderer(){return renderer}, get scene(){return scene}, get camera(){return camera},
   isMobile, THREE };
 </script>
