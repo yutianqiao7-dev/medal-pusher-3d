@@ -237,7 +237,7 @@ function mkCoin(type,x,y,tier){
           dropT:0, fallT:0, fallZone:null, hopT:1+Math.random(), fuse:-1, spin:Math.random()*6.28};
 }
 function zones(){
-  const half=110+S.up.zone*28;
+  const half=95+S.up.zone*28;
   return {sL:Math.max(WALL_L,CX-half), sR:Math.min(WALL_R,CX+half), jL:CX-20, jR:CX+20};
 }
 function pusherFront(t){
@@ -295,7 +295,8 @@ function newGame(mode){
 
 /* ================= 投入 ================= */
 function tryDrop(x){
-  if(!S||S.phase!=="play"||S.busy||S.dropCd>0) return;
+  // 液晶抽選（奥のモニター）中は投入OK。JPチャレンジ（クルーン）の間だけブロックする
+  if(!S||S.phase!=="play"||S.kurun||S.dropCd>0) return;
   let type=S.sel;
   if(type==="normal"){ if(S.stock<=0){ autoSelect(); return; } S.stock--; }
   else { if(S.inv[type]<=0){ S.sel="normal"; refreshUI(); return; } S.inv[type]--; }
@@ -320,7 +321,7 @@ function coinFalls(c){
   const z=zones();
   const inScore=c.x>=z.sL&&c.x<=z.sR;
 
-  // JPボール（物理オブジェクト）：スコアゾーンに落ちたら1個獲得、外れたら消滅
+  // JPボール（物理オブジェクト）：スコアゾーンに落ちたら1個獲得＋毎回小さな特典、外れたら消滅
   if(c.type==="jpball"){
     if(inScore){
       S.balls=Math.min(3,S.balls+1);
@@ -328,6 +329,10 @@ function coinFalls(c){
       burst3D(c.x,FRONT,0x3498db,18);
       SND.jp();
       c.fallZone="score";
+      const r=Math.random();
+      if(r<0.55){ spawnCoinRain(10); addFloat(c.x,"+10枚","#ffd94d",false,26); }
+      else if(r<0.85){ spawnCoinRain(30); addFloat(c.x,"+30枚","#ff8a5c",false,26); }
+      else { spawnBall(); addFloat(c.x,"🔵ボーナス!","#3498db",false,26); }
       if(S.balls>=3) setTimeout(triggerJP,500);
     }else{
       addFloat(c.x,"球ロスト…","#c9a98a");
@@ -355,7 +360,8 @@ function coinFalls(c){
       if(S.score>=S.target) setTimeout(roundClear,600);
     }else{
       // エンドレスモード：チケットなし。落ちたコインがそのままストックに獲得される
-      const coinsBack=Math.max(1,Math.round(pts/10));
+      // コンボ倍率はかけない＝普通のコインは1枚落ちたら1枚のまま（ゴールドなど価値の高い種類は元の価値分だけ多く返る）
+      const coinsBack=Math.max(1,Math.round(c.d.value/10));
       S.stock+=coinsBack;
       S.totalCoinsWon+=coinsBack;
       addFloat(c.x,"🪙+"+coinsBack,jp?"#ffd94d":"#7dffb0",jp);
@@ -630,23 +636,30 @@ function spawnCoinRain(n){
   S.rainLeft=(S.rainLeft||0)+n;
 }
 
-// クルーン（お椀型の玉転がし抽選）でJPチャレンジの報酬を決定
+// クルーン（回転する円盤の穴に玉が入るせめぎ合い抽選）でJPチャレンジの報酬を決定
 const KURUN_POCKETS=[
   {label:"JACKPOT",col:"#ffd94d",type:"jackpot"},
   {label:"ハズレ", col:"#4a3a2a",type:"miss"},
   {label:"中",     col:"#ff8a5c",type:"mid"},
-  {label:"ハズレ", col:"#4a3a2a",type:"miss"},
   {label:"大",     col:"#ff5c5c",type:"big"},
   {label:"ハズレ", col:"#4a3a2a",type:"miss"},
   {label:"小",     col:"#7dffb0",type:"small"},
-  {label:"JACKPOT",col:"#ffd94d",type:"jackpot"},
 ];
-function easeOutCubic(p){ return 1-Math.pow(1-p,3); }
+function easeInOutQuad(p){ return p<0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2; }
 function triggerJP(){
   if(!S||S.busy) return;
   S.balls=0; S.busy=true; refreshUI();
-  const targetIdx=Math.floor(Math.random()*KURUN_POCKETS.length);
-  S.kurun={ t:0, dur:3.2, targetIdx, startAngle:Math.random()*Math.PI*2, resolved:false };
+  const n=KURUN_POCKETS.length;
+  const targetIdx=Math.floor(Math.random()*n);
+  const decoys=[];
+  while(decoys.length<2){
+    const d=Math.floor(Math.random()*n);
+    if(d!==targetIdx&&!decoys.includes(d)) decoys.push(d);
+  }
+  S.kurun={
+    t:0, dur:4.6, targetIdx, decoys, resolved:false,
+    discSpin:(0.55+Math.random()*0.25)*(Math.random()<0.5?1:-1)
+  };
   document.getElementById("jpResult").textContent="";
   document.getElementById("jpOv").style.display="flex";
 }
@@ -677,39 +690,59 @@ function resolveKurunOutcome(p){
   else { SND.over(); }
   refreshUI(); sbDirty=true;
 }
+// 玉の「せめぎ合い」動き：助走→ニアミス1→ニアミス2→本命 の4区間で、円盤に対する相対角と半径を計算
+function kurunBallPos(k){
+  const n=KURUN_POCKETS.length;
+  const baseAngle=idx=>(idx/n)*Math.PI*2-Math.PI/2;
+  const shortDelta=(from,to)=>{ let d=to-from; return ((d%(Math.PI*2))+Math.PI*3)%(Math.PI*2)-Math.PI; };
+  const p=Math.min(1,k.t/k.dur);
+  const seg=[0,0.22,0.48,0.74,1.0];
+  if(p<seg[1]){
+    const sp=p/seg[1];
+    return { relAngle:-Math.PI/2+sp*Math.PI*2*2.4, radiusFrac:0.88 };
+  }
+  if(p<seg[2]){
+    const sp=(p-seg[1])/(seg[2]-seg[1]);
+    const startA=-Math.PI/2+Math.PI*2*2.4, endA=baseAngle(k.decoys[0]);
+    return { relAngle:startA+shortDelta(startA,endA)*easeInOutQuad(sp), radiusFrac:0.88-0.55*Math.sin(Math.min(1,sp)*Math.PI) };
+  }
+  if(p<seg[3]){
+    const sp=(p-seg[2])/(seg[3]-seg[2]);
+    const startA=baseAngle(k.decoys[0]), endA=baseAngle(k.decoys[1]);
+    return { relAngle:startA+shortDelta(startA,endA)*easeInOutQuad(sp), radiusFrac:0.88-0.55*Math.sin(Math.min(1,sp)*Math.PI) };
+  }
+  const sp=(p-seg[3])/(seg[4]-seg[3]);
+  const startA=baseAngle(k.decoys[1]), endA=baseAngle(k.targetIdx);
+  return { relAngle:startA+shortDelta(startA,endA)*easeInOutQuad(sp), radiusFrac:0.88-0.60*easeInOutQuad(sp) };
+}
 function drawKurun(k){
   const cv=document.getElementById("kurunCanvas");
   const c=cv.getContext("2d");
   const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=W/2-8;
   c.clearRect(0,0,W,H);
   const n=KURUN_POCKETS.length;
+  const discRot=k.t*k.discSpin;
   for(let i=0;i<n;i++){
-    const a0=(i/n)*Math.PI*2-Math.PI/2, a1=((i+1)/n)*Math.PI*2-Math.PI/2;
+    const a0=(i/n)*Math.PI*2-Math.PI/2+discRot, a1=((i+1)/n)*Math.PI*2-Math.PI/2+discRot;
     c.beginPath(); c.moveTo(cx,cy); c.arc(cx,cy,R,a0,a1); c.closePath();
     c.fillStyle=KURUN_POCKETS[i].col;
-    c.globalAlpha=(k.resolved&&i===k.targetIdx)?1:0.55;
+    c.globalAlpha=(k.resolved&&i===k.targetIdx)?1:0.6;
     c.fill(); c.globalAlpha=1;
     const mid=(a0+a1)/2;
     c.save();
     c.translate(cx+Math.cos(mid)*R*0.68, cy+Math.sin(mid)*R*0.68);
     c.rotate(mid+Math.PI/2);
-    c.fillStyle="#1a1410"; c.font="bold 13px sans-serif"; c.textAlign="center";
+    c.fillStyle="#1a1410"; c.font="bold 15px sans-serif"; c.textAlign="center";
     c.fillText(KURUN_POCKETS[i].label,0,0);
     c.restore();
   }
-  c.beginPath(); c.arc(cx,cy,R*0.32,0,Math.PI*2);
+  c.beginPath(); c.arc(cx,cy,R*0.30,0,Math.PI*2);
   c.fillStyle="#0d0b08"; c.fill();
   c.strokeStyle="#6b4a2a"; c.lineWidth=3; c.stroke();
-  const targetAngle=((k.targetIdx+0.5)/n)*Math.PI*2-Math.PI/2;
-  let delta=targetAngle-k.startAngle;
-  delta=((delta%(Math.PI*2))+Math.PI*2)%(Math.PI*2);
-  const totalAngle=delta+3*Math.PI*2;
-  const prog=Math.min(1,k.t/k.dur);
-  const eased=easeOutCubic(prog);
-  const angle=k.startAngle+totalAngle*eased;
-  const radius=R*(0.92-0.62*eased);
+  const {relAngle,radiusFrac}=kurunBallPos(k);
+  const angle=relAngle+discRot, radius=R*radiusFrac;
   const bx=cx+Math.cos(angle)*radius, by=cy+Math.sin(angle)*radius;
-  c.beginPath(); c.arc(bx,by,7,0,Math.PI*2);
+  c.beginPath(); c.arc(bx,by,8,0,Math.PI*2);
   c.fillStyle="#f0f0f0"; c.fill();
   c.strokeStyle="#888"; c.lineWidth=1.5; c.stroke();
 }
@@ -1005,16 +1038,16 @@ function drawSlotOnBoard(c,sa){
   }
 }
 {
-  const backTower=box(TABLE_W+4.5, 13, 1.2, stripeMat);
-  backTower.position.set(0, 5.2, Z_BACK-1.6);
+  const backTower=box(TABLE_W+4.5, 15, 1.2, stripeMat);
+  backTower.position.set(0, 5.6, Z_BACK-1.6);
   world.add(backTower);
-  const sb=new THREE.Mesh(new THREE.PlaneGeometry(13.5, 5.9),
+  const sb=new THREE.Mesh(new THREE.PlaneGeometry(16.5, 7.2),
     new THREE.MeshBasicMaterial({map:sbTex}));
-  sb.position.set(0, 6.4, Z_BACK-0.95);
+  sb.position.set(0, 6.6, Z_BACK-0.95);
   sb.rotation.x=-0.06;
   world.add(sb);
-  const sbFrame=box(14.4, 6.8, 0.35, darkWoodMat);
-  sbFrame.position.set(0, 6.4, Z_BACK-1.15);
+  const sbFrame=box(17.5, 8.2, 0.35, darkWoodMat);
+  sbFrame.position.set(0, 6.6, Z_BACK-1.15);
   world.add(sbFrame);
   // テントの屋根（手前上部の飾り幕）
   const valance=box(TABLE_W+6, 2.2, 0.4, stripeMat);
