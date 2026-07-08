@@ -151,6 +151,14 @@
         <div class="lcdResult" id="jpResult">&nbsp;</div>
       </div>
     </div>
+    <div class="overlay" id="ballRouletteOv" style="display:none">
+      <div class="lcdBox">
+        <div class="lcdLights"></div>
+        <div class="lcdTitle">🎡 ボーナスルーレット 🎡</div>
+        <canvas id="ballRouletteCanvas" width="280" height="280" class="kurunCanvas"></canvas>
+        <div class="lcdResult" id="ballRouletteResult">&nbsp;</div>
+      </div>
+    </div>
   </div>
   <div id="side">
     <div class="panel">
@@ -267,8 +275,8 @@ function newGame(mode){
     up:{zone:0,combo:0,ticket:0,speed:0,stock:0},
     totalScore:0, warmup:false, warmFell:0,
     balls:0, busy:false, towerLeft:0, towerTimer:0,
-    slotQueue:0, rainLeft:0, rainTimer:0,
-    totalCoinsWon:0, slotAnim:null, kurun:null,
+    eventQueue:[], rainQueue:[], rainTimer:0,
+    totalCoinsWon:0, slotAnim:null, kurun:null, ballRoulette:null,
   };
   applyModeUI();
   // 台を飽和密度で敷き詰める（隙間があると押し出しが発生しない）
@@ -321,7 +329,7 @@ function coinFalls(c){
   const z=zones();
   const inScore=c.x>=z.sL&&c.x<=z.sR;
 
-  // JPボール（物理オブジェクト）：スコアゾーンに落ちたら1個獲得＋毎回小さな特典、外れたら消滅
+  // JPボール（物理オブジェクト）：スコアゾーンに落ちたら1個獲得＋毎回ルーレットで特典、外れたら消滅
   if(c.type==="jpball"){
     if(inScore){
       S.balls=Math.min(3,S.balls+1);
@@ -329,11 +337,8 @@ function coinFalls(c){
       burst3D(c.x,FRONT,0x3498db,18);
       SND.jp();
       c.fallZone="score";
-      const r=Math.random();
-      if(r<0.55){ spawnCoinRain(10); addFloat(c.x,"+10枚","#ffd94d",false,26); }
-      else if(r<0.85){ spawnCoinRain(30); addFloat(c.x,"+30枚","#ff8a5c",false,26); }
-      else { spawnBall(); addFloat(c.x,"🔵ボーナス!","#3498db",false,26); }
-      if(S.balls>=3) setTimeout(triggerJP,500);
+      pushEvent("ballRoulette");
+      if(S.balls>=3) pushEvent("jp");
     }else{
       addFloat(c.x,"球ロスト…","#c9a98a");
       SND.lost();
@@ -368,10 +373,9 @@ function coinFalls(c){
     }
     burst3D(c.x,FRONT,jp?0xffd94d:0x7dffb0,jp?26:12);
     jp?SND.jp():SND.score(S.combo);
-    if(queueThis&&S.slotQueue<3){
-      S.slotQueue++;
+    if(queueThis){
       addFloat(c.x,"保留+1","#e67e22",false,34);
-      setTimeout(processSlotQueue,350);
+      pushEvent("slot");
     }
   }else{
     addFloat(c.x,"ロスト","#c9a98a");
@@ -419,21 +423,25 @@ function update(dt){
       S.towerLeft-=n;
     }
   }
-  // 液晶抽選の小当たり・中当たり演出：いつもの投入エリア付近にコインを1枚ずつ降らせる
-  if(S.rainLeft>0){
+  // 液晶抽選・ルーレットの特典演出：いつもの投入エリア付近に指定された種類のコインを1枚ずつ降らせる
+  if(S.rainQueue.length>0){
     S.rainTimer-=dt;
     if(S.rainTimer<=0){
       S.rainTimer=0.09;
+      const cur=S.rainQueue[0];
       const x=Math.max(WALL_L+20,Math.min(WALL_R-20,CX+(Math.random()-0.5)*160));
-      const c=mkCoin("normal", x, DROP_Y, 1);
+      const c=mkCoin(cur.type, x, DROP_Y, 1);
       c.state="drop"; c.dropT=0.32;
       S.coins.push(c);
-      S.rainLeft--;
+      cur.left--;
+      if(cur.left<=0) S.rainQueue.shift();
     }
   }
-  // 液晶抽選（奥のモニター）・クルーンJPチャレンジのアニメーション更新
+  // 液晶抽選（奥のモニター）・ボーナスルーレット・クルーンJPチャレンジのアニメーション更新
   if(S.slotAnim) updateSlotAnim(dt);
+  if(S.ballRoulette) updateBallRoulette(dt);
   if(S.kurun) updateKurun(dt);
+  processEventQueue(); // busyが解けたイベントを取りこぼさないための毎フレームの保険
 
   const damp=Math.max(0,1-5.5*dt);
   for(const c of S.coins){
@@ -567,14 +575,25 @@ function updateMiniShop(){
     btn.disabled=!S||S.phase!=="play"||S.tickets<item.cost;
   }
 }
-/* ================= 液晶抽選（奥のモニター）・クルーンJPチャレンジ（エンドレスモード専用） ================= */
-const SLOT_SYMS=["🍒","🔔","⭐","💎","🔵"];
-function processSlotQueue(){
-  if(!S||S.mode!=="endless"||S.busy||S.slotQueue<=0) return;
-  S.slotQueue--;
+/* ================= 液晶抽選（奥のモニター）・ボーナスルーレット・クルーンJPチャレンジ（エンドレスモード専用） ================= */
+// イベントキュー：液晶抽選／ボーナスルーレット／JPチャレンジをまとめて管理する。
+// busyが解けた瞬間に必ず次を拾って発火させるので、以前あった「タイミング次第でJPが発動しないまま」というバグが起きない。
+function pushEvent(type){
+  if(!S) return;
+  if(type==="slot"&&S.eventQueue.filter(e=>e==="slot").length>=3) return; // 液晶保留は最大3
+  S.eventQueue.push(type);
   refreshUI();
-  triggerSlot();
+  processEventQueue();
 }
+function processEventQueue(){
+  if(!S||S.busy||S.eventQueue.length===0) return;
+  const ev=S.eventQueue.shift();
+  refreshUI();
+  if(ev==="slot") triggerSlot();
+  else if(ev==="ballRoulette") triggerBallRoulette();
+  else if(ev==="jp") triggerJP();
+}
+const SLOT_SYMS=["🍒","🔔","⭐","💎","🔵"];
 function triggerSlot(){
   if(!S||S.mode!=="endless"||S.busy) return;
   S.busy=true;
@@ -615,7 +634,7 @@ function updateSlotAnim(dt){
     S.slotAnim=null;
     S.busy=false;
     sbDirty=true;
-    setTimeout(processSlotQueue,250);
+    processEventQueue();
   }
 }
 function resolveSlotOutcome(outcome){
@@ -632,8 +651,87 @@ function spawnBall(){
 function spawnMedalTower(){
   S.towerLeft=70; S.towerTimer=0;
 }
-function spawnCoinRain(n){
-  S.rainLeft=(S.rainLeft||0)+n;
+// コインの雨：種類ごとにキューへ積み、いつもの投入エリア付近から1枚ずつ降らせる
+function spawnTypedRain(type,n){
+  S.rainQueue.push({type,left:n});
+}
+function spawnCoinRain(n){ spawnTypedRain("normal",n); }
+
+// ボーナスルーレット：JPボールが1つ落ちるたびに開催。特典に他のコイン種類も含む
+const BALL_ROULETTE_REWARDS=[
+  {label:"コイン+10",   col:"#ffd94d", fn:()=>spawnCoinRain(10)},
+  {label:"コイン+30",   col:"#ff8a5c", fn:()=>spawnCoinRain(30)},
+  {label:"🔵+1",        col:"#3498db", fn:()=>spawnBall()},
+  {label:"★ゴールド",   col:"#ffe07a", fn:()=>spawnTypedRain("gold",3)},
+  {label:"💣ボム",      col:"#8f88a0", fn:()=>spawnTypedRain("bomb",2)},
+  {label:"🐰ウサギ",    col:"#ffb8d6", fn:()=>spawnTypedRain("rabbit",2)},
+  {label:"🧲マグネット", col:"#9fc0ff", fn:()=>spawnTypedRain("magnet",2)},
+  {label:"⬛ビッグ",     col:"#ffbb7a", fn:()=>spawnTypedRain("big",1)},
+];
+function triggerBallRoulette(){
+  if(!S||S.busy) return;
+  S.busy=true;
+  const n=BALL_ROULETTE_REWARDS.length;
+  const targetIdx=Math.floor(Math.random()*n);
+  S.ballRoulette={ t:0, dur:2.6, targetIdx, resolved:false };
+  document.getElementById("ballRouletteResult").textContent="";
+  document.getElementById("ballRouletteOv").style.display="flex";
+}
+function updateBallRoulette(dt){
+  const br=S.ballRoulette;
+  br.t+=dt;
+  drawBallRoulette(br);
+  if(br.t>=br.dur&&!br.resolved){
+    br.resolved=true;
+    const rew=BALL_ROULETTE_REWARDS[br.targetIdx];
+    rew.fn();
+    const resultEl=document.getElementById("ballRouletteResult");
+    resultEl.textContent=`${rew.label} 獲得！`;
+    resultEl.style.color=rew.col;
+    SND.jp();
+    refreshUI(); sbDirty=true;
+  }
+  if(br.resolved&&br.t>=br.dur+1.1){
+    S.ballRoulette=null;
+    document.getElementById("ballRouletteOv").style.display="none";
+    S.busy=false;
+    processEventQueue();
+  }
+}
+function drawBallRoulette(br){
+  const cv=document.getElementById("ballRouletteCanvas");
+  const c=cv.getContext("2d");
+  const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=W/2-8;
+  c.clearRect(0,0,W,H);
+  const n=BALL_ROULETTE_REWARDS.length;
+  const pointerAngle=-Math.PI/2;
+  const targetSegMid=(br.targetIdx+0.5)/n*Math.PI*2;
+  const p=Math.min(1,br.t/br.dur);
+  const eased=1-Math.pow(1-p,3);
+  const finalRot=4*Math.PI*2+(pointerAngle-targetSegMid);
+  const rot=finalRot*eased;
+  for(let i=0;i<n;i++){
+    const a0=(i/n)*Math.PI*2+rot, a1=((i+1)/n)*Math.PI*2+rot;
+    c.beginPath(); c.moveTo(cx,cy); c.arc(cx,cy,R,a0,a1); c.closePath();
+    c.fillStyle=BALL_ROULETTE_REWARDS[i].col;
+    c.globalAlpha=(br.resolved&&i===br.targetIdx)?1:0.75;
+    c.fill(); c.globalAlpha=1;
+    c.strokeStyle="#1a1410"; c.lineWidth=2; c.stroke();
+    const mid=(a0+a1)/2;
+    c.save();
+    c.translate(cx+Math.cos(mid)*R*0.62, cy+Math.sin(mid)*R*0.62);
+    c.rotate(mid+Math.PI/2);
+    c.fillStyle="#1a1410"; c.font="bold 12px sans-serif"; c.textAlign="center";
+    c.fillText(BALL_ROULETTE_REWARDS[i].label,0,0);
+    c.restore();
+  }
+  c.beginPath(); c.arc(cx,cy,10,0,Math.PI*2);
+  c.fillStyle="#3a2a18"; c.fill();
+  c.beginPath();
+  c.moveTo(cx-12,cy-R-6); c.lineTo(cx+12,cy-R-6); c.lineTo(cx,cy-R+10);
+  c.closePath();
+  c.fillStyle="#ffd94d"; c.fill();
+  c.strokeStyle="#8e2a1c"; c.lineWidth=2; c.stroke();
 }
 
 // クルーン（回転する円盤の穴に玉が入るせめぎ合い抽選）でJPチャレンジの報酬を決定
@@ -679,7 +777,7 @@ function updateKurun(dt){
     S.kurun=null;
     document.getElementById("jpOv").style.display="none";
     S.busy=false;
-    setTimeout(processSlotQueue,250);
+    processEventQueue();
   }
 }
 function resolveKurunOutcome(p){
@@ -1043,11 +1141,11 @@ function drawSlotOnBoard(c,sa){
   world.add(backTower);
   const sb=new THREE.Mesh(new THREE.PlaneGeometry(16.5, 7.2),
     new THREE.MeshBasicMaterial({map:sbTex}));
-  sb.position.set(0, 6.6, Z_BACK-0.95);
+  sb.position.set(0, 3.3, Z_BACK-0.95);   // カメラ画角の上端に余裕を持って収まるよう低めに設置（サイズはそのまま）
   sb.rotation.x=-0.06;
   world.add(sb);
   const sbFrame=box(17.5, 8.2, 0.35, darkWoodMat);
-  sbFrame.position.set(0, 6.6, Z_BACK-1.15);
+  sbFrame.position.set(0, 3.3, Z_BACK-1.15);
   world.add(sbFrame);
   // テントの屋根（手前上部の飾り幕）
   const valance=box(TABLE_W+6, 2.2, 0.4, stripeMat);
@@ -1263,7 +1361,7 @@ function refreshUI(){
   if(S.mode==="endless"){
     document.getElementById("uiScoreEndless").textContent=S.totalCoinsWon.toLocaleString();
     document.getElementById("uiBalls").textContent="●".repeat(S.balls)+"○".repeat(3-S.balls);
-    document.getElementById("uiQueue").textContent="●".repeat(S.slotQueue)+"○".repeat(3-S.slotQueue);
+    { const sq=S.eventQueue.filter(e=>e==="slot").length; document.getElementById("uiQueue").textContent="●".repeat(sq)+"○".repeat(3-sq); }
   }
   for(const k of ORDER){
     const b=btnEls[k];
@@ -1406,7 +1504,8 @@ drawScoreboard();
 
 // 検証用フック
 window.__g={ get S(){return S}, update, tryDrop, render3D, pusherFront, newGame, resize,
-  triggerSlot, triggerJP, spawnMedalTower, spawnCoinRain, processSlotQueue, spawnBall,
+  triggerSlot, triggerJP, triggerBallRoulette, spawnMedalTower, spawnCoinRain, spawnTypedRain,
+  pushEvent, processEventQueue, spawnBall,
   get renderer(){return renderer}, get scene(){return scene}, get camera(){return camera},
   isMobile, THREE };
 </script>
