@@ -20,7 +20,7 @@
   #comboBox .c1 { font-size:30px; font-weight:900; color:#ffb347; -webkit-text-stroke:1.5px #6b2c12; text-shadow:0 3px 8px rgba(0,0,0,.6); }
   #comboBox .c2 { font-size:16px; font-weight:bold; color:#ffe08a; text-shadow:0 2px 4px rgba(0,0,0,.7); }
   #warnBox { position:absolute; top:42%; left:50%; transform:translateX(-50%); font-size:22px; font-weight:900; color:#ff5a5a; text-shadow:0 2px 6px rgba(0,0,0,.8); pointer-events:none; display:none; }
-  #towerBox { position:absolute; top:8%; left:50%; transform:translateX(-50%); text-align:center; font-weight:900; color:#ffd94d; text-shadow:0 2px 6px rgba(0,0,0,.85); pointer-events:none; display:none; }
+  #towerBox { position:absolute; top:1.5%; left:50%; transform:translateX(-50%); text-align:center; font-weight:900; color:#ffd94d; text-shadow:0 2px 6px rgba(0,0,0,.85); pointer-events:none; display:none; }
   #towerBox .t1 { font-size:19px; }
   #towerBox .t2 { font-size:13px; color:#ffe9a8; }
   #side { width:260px; align-self:center; display:flex; flex-direction:column; gap:10px; }
@@ -123,7 +123,7 @@
     <div id="floats"></div>
     <div id="comboBox"><div class="c1"></div><div class="c2"></div></div>
     <div id="warnBox"></div>
-    <div id="towerBox"><div class="t1">🏆 メダルタワー出現！</div><div class="t2">コインを投入して倒そう</div></div>
+    <div id="towerBox"><div class="t1">🏆 メダルタワー出現！</div><div class="t2">コインをぶつけて自力で崩そう！</div></div>
     <button id="muteBtn" title="サウンド切替">🔊</button>
     <button id="adminBtn" title="管理者メニュー">🔧</button>
     <div class="overlay" id="titleOv">
@@ -334,7 +334,7 @@ function newGame(mode,difficulty){
     dropCd:0, outT:-1, aimX:CX,
     up:{zone:0,combo:0,ticket:0,speed:0,stock:0},
     totalScore:0, warmup:false, warmFell:0,
-    balls:0, busy:false, towerLeft:0, towerTimer:0, towerVisual:null,
+    balls:0, busy:false, towerVisual:null,
     eventQueue:[], rainQueue:[], rainTimer:0,
     totalCoinsWon:0, slotAnim:null, kurun:null, ballRoulette:null,
     pendingDailyBonus:0,
@@ -400,7 +400,6 @@ function tryDrop(x){
   S.coins.push(c);
   S.dropCd=0.34;
   SND.drop();
-  hitTowerIfStanding();
   refreshUI(); sbDirty=true;
 }
 function autoSelect(){
@@ -492,27 +491,8 @@ function update(dt){
 
   if(S.phase!=="play"&&!S.warmup){ updateFx(dt); return; }
 
-  // JP当選：まず視覚的な「タワー」が積み上がって崩れる演出をして、崩れた瞬間に実コインを投入する
+  // JP当選：台の上にコイン200枚ぶんのタワーが積み上がる（塔そのものが報酬。別枠の払い出しは無し）
   if(S.towerVisual) updateTowerVisual(dt);
-  // タワー崩壊後：スコアゾーン手前にコインを一気に降らせて、そのまま雪崩れ落とす
-  // （奥から入れると密集した山を何分も押し出す必要があり実質もらえないため、前方に直接投下する）
-  if(S.towerLeft>0){
-    S.towerTimer-=dt;
-    if(S.towerTimer<=0){
-      S.towerTimer=0.04;
-      const n=Math.min(6,S.towerLeft);
-      for(let i=0;i<n;i++){
-        const x=WALL_L+20+Math.random()*(WALL_R-WALL_L-40);
-        const y=340+Math.random()*160;
-        const c=mkCoin("normal", x, y, 2);
-        c.state="drop"; c.dropT=0.22+Math.random()*0.15;
-        c.vy=220+Math.random()*140;      // 着地後すぐ前方へ押し出されるよう初速を持たせる
-        c.vx=(Math.random()-0.5)*70;
-        S.coins.push(c);
-      }
-      S.towerLeft-=n;
-    }
-  }
   // 液晶抽選・ルーレットの特典演出：いつもの投入エリア付近に指定された種類のコインを1枚ずつ降らせる
   if(S.rainQueue.length>0){
     S.rainTimer-=dt;
@@ -576,6 +556,7 @@ function update(dt){
     }
     if(c.x<WALL_L+c.r){ c.x=WALL_L+c.r; c.vx=Math.abs(c.vx)*0.4; }
     if(c.x>WALL_R-c.r){ c.x=WALL_R-c.r; c.vx=-Math.abs(c.vx)*0.4; }
+    towerObstacle(c);
   }
 
   // コイン同士の衝突（同じ段のみ）— 後方への押し戻しを減衰させるラチェット摩擦つき
@@ -768,37 +749,57 @@ function spawnBall(){
   c.state="drop"; c.dropT=0.32;
   S.coins.push(c);
 }
-const TOWER_TOTAL=200;       // タワー崩壊後に実際に投入されるコインの合計枚数
-const TOWER_BLOCKS=8;        // タワーの段数＝倒すのに必要な投入回数
+// JPメダルタワー：台の上に本物のコイン200枚ぶんの塔が積み上がる。
+// 別枠の払い出しは無く、塔を構成するコインそのものが報酬。
+// プレイヤーが押し出したコインが塔にぶつかるたびに上からコインが弾け飛んで実コインになり、
+// 残りが少なくなると全体が物理演算で崩れ落ちる。
+const TOWER_COINS=200;                               // タワーが内包する実コインの総数
+const TOWER_STACKS=5, TOWER_LAYERS=20;               // 5本柱×20枚＝100枚の見た目コイン
+const TOWER_DISCS_TOTAL=TOWER_STACKS*TOWER_LAYERS;
+const TOWER_DISC_COINS=TOWER_COINS/TOWER_DISCS_TOTAL; // 見た目コイン1枚＝実コイン2枚
+const TOWER_X=CX, TOWER_Y=330, TOWER_SIM_R=30;       // シム座標上の位置と footprint 半径
+const TOWER_COLLAPSE_AT=30;                          // 残りがここを切ったら全崩壊
 function spawnMedalTower(){
-  // 実物のコインが台の上に積み上がって「立ったまま」待機し、プレイヤーがコインを投入するたびに
-  // 1段ずつ物理的に弾き飛ばされ、最後の1段で残り全体が本物の物理演算で手前に倒れ込む
-  S.towerVisual={ phase:"rising", t:0, blocksRemaining:TOWER_BLOCKS, prevRemaining:TOWER_BLOCKS };
-}
-// プレイヤーがコインを投入するたびに呼ばれる：立っているタワーがあれば1段崩す（実際の弾き飛ばしはレンダー側の物理演算で処理）
-function hitTowerIfStanding(){
-  const tv=S.towerVisual;
-  if(!tv||tv.phase!=="standing") return;
-  tv.blocksRemaining--;
-  S.shake=Math.max(S.shake,5);
-  SND.hop();
-  if(tv.blocksRemaining<=0){
-    tv.phase="toppling"; tv.t=0;
-    S.shake=14; SND.boom();
+  S.towerVisual={ phase:"rising", t:0, discsLeft:TOWER_DISCS_TOTAL, knock:0, knockAll:false, hitCd:0 };
+  // 出現位置に重なっている台上のコインは外へ押し出しておく（静的な重なりでタワーが勝手に削れないように）
+  for(const c of S.coins){
+    if(c.tier!==2) continue;
+    const dx=c.x-TOWER_X, dy=c.y-TOWER_Y, d=Math.hypot(dx,dy), rr=TOWER_SIM_R+c.r;
+    if(d<rr&&d>0.01){ c.x=TOWER_X+dx/d*rr; c.y=TOWER_Y+dy/d*rr; }
   }
 }
 function updateTowerVisual(dt){
   const tv=S.towerVisual;
   tv.t+=dt;
+  if(tv.hitCd>0) tv.hitCd-=dt;
   if(tv.phase==="rising"){
-    const riseDur=TOWER_BLOCKS*0.16;
-    if(tv.t>=riseDur){ tv.phase="standing"; tv.t=0; }
+    if(tv.t>=1.2){ tv.phase="standing"; tv.t=0; }
   }
-  else if(tv.phase==="toppling"&&tv.t>=1.8){
-    // 物理シミュレーションが十分落ち着くまで待ってから本来の報酬コインを投入する
+  else if(tv.phase==="falling"&&tv.t>=2.2){
+    // 崩れた破片はすべて実コインへ変換済み（変換はレンダー側の物理演算が行う）
     S.towerVisual=null;
-    S.towerLeft=TOWER_TOTAL; S.towerTimer=0;
-    burst3D(CX,300,0xffd94d,50);
+    burst3D(TOWER_X,TOWER_Y,0xffd94d,50);
+  }
+}
+// タワーは台の上の障害物：コインは通り抜けられず、ぶつかった衝撃で上からコインが弾け飛ぶ
+function towerObstacle(c){
+  const tv=S.towerVisual;
+  if(!tv||tv.phase==="falling"||c.tier!==2) return;
+  const dx=c.x-TOWER_X, dy=c.y-TOWER_Y, d=Math.hypot(dx,dy), rr=TOWER_SIM_R+c.r;
+  if(d>=rr||d<0.01) return;
+  const nx=dx/d, ny=dy/d;
+  const vin=-(c.vx*nx+c.vy*ny);   // タワー中心へ向かう速度成分
+  c.x=TOWER_X+nx*rr; c.y=TOWER_Y+ny*rr;
+  if(vin>0){ c.vx+=nx*vin*1.2; c.vy+=ny*vin*1.2; }
+  if(tv.phase==="standing"&&tv.hitCd<=0&&vin>10){
+    tv.hitCd=0.35;
+    const n=Math.min(3,tv.discsLeft);
+    tv.discsLeft-=n; tv.knock+=n;
+    S.shake=Math.max(S.shake,4); SND.hop();
+    if(tv.discsLeft<=TOWER_COLLAPSE_AT){
+      tv.phase="falling"; tv.t=0; tv.knockAll=true;
+      S.shake=14; SND.boom();
+    }
   }
 }
 // コインの雨：種類ごとにキューへ積み、いつもの投入エリア付近から1枚ずつ降らせる
@@ -1291,11 +1292,13 @@ function drawSlotOnBoard(c,sa){
   world.add(backTower);
   const sb=new THREE.Mesh(new THREE.PlaneGeometry(16.5, 7.2),
     new THREE.MeshBasicMaterial({map:sbTex}));
-  sb.position.set(0, 3.3, Z_BACK-0.95);   // カメラ画角の上端に余裕を持って収まるよう低めに設置（サイズはそのまま）
-  sb.rotation.x=-0.06;
+  // 傾けると上端が奥の木枠(中身の詰まった板)の中へ沈み込み、液晶上部が木で隠れてしまうため傾けず、枠より確実に手前へ置く
+  sb.position.set(0, 3.3, Z_BACK-0.8);
+  sb.name="sbScreen";
   world.add(sb);
   const sbFrame=box(17.5, 8.2, 0.35, darkWoodMat);
   sbFrame.position.set(0, 3.3, Z_BACK-1.15);
+  sbFrame.name="sbFrame";
   world.add(sbFrame);
   // テントの屋根（手前上部の飾り幕）
   const valance=box(TABLE_W+6, 2.2, 0.4, stripeMat);
@@ -1398,15 +1401,14 @@ function coinY(c){
   if(c.tier===1) return PUSH_TOP+COIN_H/2;
   return COIN_H/2;
 }
-// JP当選時の「タワー崩し」演出：台の上に実物のコインと同じ形・同じ高さで積み上がり、
-// 崩れる時はcannon-esによる本物の剛体物理演算で手前に倒れ込む（アニメーションによる見せかけの回転ではない）
+// JPメダルタワーの3D表現：実物のコインと同じ形のディスクを5本柱×20枚で積み上げ、
+// 弾け飛ぶ/崩れる動きはcannon-esの剛体物理演算。落ちた破片はその場で実コイン(シム側)へ変換される
 const TOWER_R=TYPES.normal.r*K;                 // 実際の台コインと同じ半径
-const COINS_PER_LAYER=4;                        // 1段(1ヒット)あたりの積層コイン枚数
-const TOWER_DISCS=TOWER_BLOCKS*COINS_PER_LAYER; // 積み上げる物理コインの総数
+const TOWER_STACK_OFFSETS=[[0,0],[0.75,0.32],[-0.75,0.32],[0.42,-0.68],[-0.42,-0.68]];
 const towerCoinMat=coinMats.normal.map(m=>{
   const c=m.clone();
   c.emissive=new THREE.Color(0xff9d00);
-  c.emissiveIntensity=0.6;
+  c.emissiveIntensity=0.45;
   return c;
 });
 let towerPhys=null;   // { world, stack:[{body,mesh}], debris:[{body,mesh,t}] }
@@ -1425,53 +1427,76 @@ function ensureTowerPhys(){
   towerPhys={world:w, coinMatPhys, stack:[], debris:[]};
   return towerPhys;
 }
+// 下の層から順に積む（配列の末尾＝最上部。knockはpopで上から弾け飛ぶ）
+// 立っている間はただのメッシュ。剛体は弾け飛ぶ瞬間にだけ作る
+// （100枚全部を最初から剛体にすると密着した凸体同士の衝突判定で処理が破綻する）
 function buildTowerStack(baseX, baseZ){
-  const tp=ensureTowerPhys();
-  for(let i=0;i<TOWER_DISCS;i++){
-    const jx=(Math.random()-0.5)*0.04, jz=(Math.random()-0.5)*0.04;
-    const body=new CANNON.Body({mass:1, shape:new CANNON.Cylinder(TOWER_R,TOWER_R,COIN_H,16), material:tp.coinMatPhys});
-    body.type=CANNON.Body.KINEMATIC;
-    body.position.set(baseX+jx, i*COIN_H+COIN_H/2, baseZ+jz);
-    tp.world.addBody(body);
-    const mesh=new THREE.Mesh(coinGeos.normal, towerCoinMat);
-    mesh.castShadow=true; mesh.receiveShadow=true;
-    mesh.visible=false;
-    mesh.position.copy(body.position);
-    world.add(mesh);
-    tp.stack.push({body,mesh});
+  ensureTowerPhys();
+  const tp=towerPhys;
+  for(let l=0;l<TOWER_LAYERS;l++){
+    for(const [ox,oz] of TOWER_STACK_OFFSETS){
+      const jx=(Math.random()-0.5)*0.03, jz=(Math.random()-0.5)*0.03;
+      const mesh=new THREE.Mesh(coinGeos.normal, towerCoinMat);
+      mesh.castShadow=true; mesh.receiveShadow=true;
+      mesh.visible=false;
+      mesh.position.set(baseX+ox+jx, l*COIN_H+COIN_H/2, baseZ+oz+jz);
+      world.add(mesh);
+      tp.stack.push({mesh});
+    }
   }
+}
+// メッシュだけの立ちコインを、その位置から動き出す剛体つきの破片へ切り替える
+function discToDebris(s,vx,vy,vz){
+  const tp=towerPhys;
+  const body=new CANNON.Body({mass:1, shape:new CANNON.Cylinder(TOWER_R,TOWER_R,COIN_H,8), material:tp.coinMatPhys});
+  body.position.set(s.mesh.position.x, s.mesh.position.y, s.mesh.position.z);
+  body.velocity.set(vx,vy,vz);
+  body.angularVelocity.set((Math.random()-0.5)*7,(Math.random()-0.5)*7,(Math.random()-0.5)*7);
+  tp.world.addBody(body);
+  s.body=body; s.t=0;
+  tp.debris.push(s);
 }
 function clearTowerPhys(){
   if(!towerPhys) return;
-  for(const s of towerPhys.stack){ world.remove(s.mesh); towerPhys.world.removeBody(s.body); }
-  for(const d of towerPhys.debris){ world.remove(d.mesh); towerPhys.world.removeBody(d.body); }
+  // 変換前の破片が残っていたらコインを失わないよう、その場で実コイン化してから消す
+  for(const d of towerPhys.debris.slice()) convertDebrisToCoins(d);
+  for(const s of towerPhys.stack) world.remove(s.mesh);
   towerPhys=null;
 }
-// 1ヒットぶん、タワー最上段のコインを実際に物理演算オブジェクトへ切り替えて弾き飛ばす
-function knockOffLayer(n){
+// タワー最上部のコインを剛体に切り替えて弾き飛ばす（衝撃を受けた側＝手前へ飛びやすく）
+function knockOffDiscs(n){
   const tp=towerPhys; if(!tp) return;
   for(let k=0;k<n && tp.stack.length;k++){
     const s=tp.stack.pop();
-    s.body.type=CANNON.Body.DYNAMIC;
-    s.body.wakeUp();
-    s.body.velocity.set((Math.random()-0.5)*3, 2+Math.random()*2, 1.5+Math.random()*2);
-    s.body.angularVelocity.set((Math.random()-0.5)*6,(Math.random()-0.5)*6,(Math.random()-0.5)*6);
-    s.t=0;
-    tp.debris.push(s);
+    discToDebris(s, (Math.random()-0.5)*3.5, 1.5+Math.random()*2, 1+Math.random()*3);
   }
 }
-// 最後のヒットで残り全部を本物の物理演算で手前へ倒す（スクリプトによる回転ではなく重力・衝突による自然な崩壊）
+// 全崩壊：残り全部を剛体化し、重力・衝突による自然な崩れ方で手前へ倒す
 function collapseRemaining(){
   const tp=towerPhys; if(!tp) return;
   while(tp.stack.length){
     const s=tp.stack.pop();
-    s.body.type=CANNON.Body.DYNAMIC;
-    s.body.wakeUp();
-    s.body.velocity.set((Math.random()-0.5)*2, 1+Math.random(), 4+Math.random()*3);
-    s.body.angularVelocity.set((Math.random()-0.5)*8,(Math.random()-0.5)*4,(Math.random()-0.5)*8);
-    s.t=0;
-    tp.debris.push(s);
+    discToDebris(s, (Math.random()-0.5)*2.5, 0.5+Math.random(), 2.5+Math.random()*3);
   }
+}
+// 落ちた破片1枚をその位置の実コイン(TOWER_DISC_COINS枚)へ変換する
+function convertDebrisToCoins(d){
+  const tp=towerPhys; if(!tp) return;
+  const idx=tp.debris.indexOf(d);
+  if(idx>=0) tp.debris.splice(idx,1);
+  world.remove(d.mesh); tp.world.removeBody(d.body);
+  if(!S) return;
+  // world座標 → シム座標へ逆変換（sx/szの逆）
+  let simX=d.body.position.x/K+CX;
+  let simY=d.body.position.z/K+(BACK+FRONT)/2;
+  simX=Math.max(WALL_L+16, Math.min(WALL_R-16, simX));
+  simY=Math.max(250, Math.min(FRONT-4, simY));
+  for(let i=0;i<TOWER_DISC_COINS;i++){
+    const c=mkCoin("normal", simX+(Math.random()-0.5)*14, simY+(Math.random()-0.5)*10, 2);
+    c.vx=(Math.random()-0.5)*40; c.vy=(Math.random()-0.5)*40;
+    S.coins.push(c);
+  }
+  burst3D(simX,simY,0xffd94d,4);
 }
 function syncTowerVisual(){
   if(!S||!S.towerVisual){
@@ -1480,36 +1505,30 @@ function syncTowerVisual(){
   }
   const tv=S.towerVisual;
   if(!towerPhys){
-    buildTowerStack(sx(CX), sz(300));
+    buildTowerStack(sx(TOWER_X), sz(TOWER_Y));
   }
   const tp=towerPhys;
   if(tv.phase==="rising"){
-    const riseDur=TOWER_BLOCKS*0.16;
-    const p=Math.min(1,tv.t/riseDur);
-    const visCount=Math.ceil(p*TOWER_DISCS);
+    const p=Math.min(1,tv.t/1.2);
+    const visCount=Math.ceil(p*TOWER_DISCS_TOTAL);
     for(let i=0;i<tp.stack.length;i++) tp.stack[i].mesh.visible=i<visCount;
-  }else if(tv.phase==="standing"){
+  }else{
     for(const s of tp.stack) s.mesh.visible=true;
-    if(tv.prevRemaining>tv.blocksRemaining){
-      knockOffLayer((tv.prevRemaining-tv.blocksRemaining)*COINS_PER_LAYER);
-      tv.prevRemaining=tv.blocksRemaining;
-    }
-  }else if(tv.phase==="toppling"){
-    if(!tv.collapsed){ collapseRemaining(); tv.collapsed=true; }
+    if(tv.knock>0){ knockOffDiscs(tv.knock); tv.knock=0; }
+    if(tv.knockAll){ collapseRemaining(); tv.knockAll=false; }
   }
-  // 立っている段は静止したまま、弾け飛んだ/崩れたコインだけがcannon-esで実際に物理演算される
-  if(tp.stack.length||tp.debris.length){
+  // 立っている柱は静止したメッシュのまま、弾け飛んだ/崩れたコインだけがcannon-esで物理演算される
+  if(tp.debris.length){
     tp.world.step(1/60, FRAME_DT, 10);
   }
-  for(const s of tp.stack) s.mesh.position.copy(s.body.position);
   for(let i=tp.debris.length-1;i>=0;i--){
     const d=tp.debris[i];
     d.t+=FRAME_DT;
     d.mesh.position.copy(d.body.position);
     d.mesh.quaternion.copy(d.body.quaternion);
-    if(d.t>2.2||d.body.position.y<-4){
-      world.remove(d.mesh); tp.world.removeBody(d.body);
-      tp.debris.splice(i,1);
+    // 落ち着いた（or 台から落ちた）破片はその場で実コインになる
+    if(d.t>1.1||d.body.position.y<-2){
+      convertDebrisToCoins(d);
     }
   }
 }
@@ -1668,9 +1687,9 @@ function syncHud(){
     warnBox.style.display="block";
     warnBox.textContent=`⚠ コイン切れ！ あと ${Math.ceil(S.outT)} 秒…`;
   }else warnBox.style.display="none";
-  if(S&&S.towerVisual&&S.towerVisual.phase==="standing"){
+  if(S&&S.towerVisual&&S.towerVisual.phase!=="rising"){
     towerBox.style.display="block";
-    towerBox.querySelector(".t2").textContent=`コインを投入して倒そう（残り${S.towerVisual.blocksRemaining}段）`;
+    towerBox.querySelector(".t2").textContent=S.towerVisual.phase==="falling"?"🎉 崩壊！コインを回収しよう！":"コインをぶつけて自力で崩そう！";
   }else towerBox.style.display="none";
 }
 
