@@ -20,6 +20,9 @@
   #comboBox .c1 { font-size:30px; font-weight:900; color:#ffb347; -webkit-text-stroke:1.5px #6b2c12; text-shadow:0 3px 8px rgba(0,0,0,.6); }
   #comboBox .c2 { font-size:16px; font-weight:bold; color:#ffe08a; text-shadow:0 2px 4px rgba(0,0,0,.7); }
   #warnBox { position:absolute; top:42%; left:50%; transform:translateX(-50%); font-size:22px; font-weight:900; color:#ff5a5a; text-shadow:0 2px 6px rgba(0,0,0,.8); pointer-events:none; display:none; }
+  #towerBox { position:absolute; top:8%; left:50%; transform:translateX(-50%); text-align:center; font-weight:900; color:#ffd94d; text-shadow:0 2px 6px rgba(0,0,0,.85); pointer-events:none; display:none; }
+  #towerBox .t1 { font-size:19px; }
+  #towerBox .t2 { font-size:13px; color:#ffe9a8; }
   #side { width:260px; align-self:center; display:flex; flex-direction:column; gap:10px; }
   .panel { background:#fff3dd; border:3px solid #b3592b; border-radius:14px; padding:12px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
   .stat { display:flex; justify-content:space-between; align-items:baseline; margin:3px 0; font-size:14px; }
@@ -120,6 +123,7 @@
     <div id="floats"></div>
     <div id="comboBox"><div class="c1"></div><div class="c2"></div></div>
     <div id="warnBox"></div>
+    <div id="towerBox"><div class="t1">🏆 メダルタワー出現！</div><div class="t2">コインを投入して倒そう</div></div>
     <button id="muteBtn" title="サウンド切替">🔊</button>
     <button id="adminBtn" title="管理者メニュー">🔧</button>
     <div class="overlay" id="titleOv">
@@ -131,8 +135,13 @@
         <span style="color:#a06a40;font-size:12px">キー 1〜7 でコイン切替 ／ 長押しで連続投入</span></p>
         <button class="bigbtn" id="startStageBtn">🏆 ステージモード</button>
         <div style="font-size:11px;color:#a06a40;margin-top:4px">目標スコアを達成してラウンドを進め、チケットで強化を購入</div>
-        <button class="bigbtn alt" id="startEndlessBtn">♾️ エンドレスモード</button>
-        <div style="font-size:11px;color:#a06a40;margin-top:4px">手前に落ちたコインがそのまま獲得に。中央ゾーンで奥のモニターが液晶抽選、玉が3つ落ちたらクルーンでJPチャレンジ！進捗は自動保存され、日をまたぐとログインボーナスも！</div>
+        <div style="font-size:13px;color:#3498db;font-weight:bold;margin-top:14px">♾️ エンドレスモード（難易度を選択）</div>
+        <div style="display:flex;gap:6px;margin-top:6px">
+          <button class="bigbtn alt" id="startEndlessEasyBtn" style="flex:1;padding:10px 4px;font-size:13px;margin-top:0">簡単</button>
+          <button class="bigbtn alt" id="startEndlessNormalBtn" style="flex:1;padding:10px 4px;font-size:13px;margin-top:0">普通</button>
+          <button class="bigbtn alt" id="startEndlessHardBtn" style="flex:1;padding:10px 4px;font-size:13px;margin-top:0">難しい</button>
+        </div>
+        <div style="font-size:11px;color:#a06a40;margin-top:4px">手前に落ちたコインがそのまま獲得に。難易度が上がるほどスコアゾーンが狭くなります。中央ゾーンで奥のモニターが液晶抽選、玉が3つ落ちたらクルーンでJPチャレンジ！進捗は自動保存され、日をまたぐとログインボーナスも！</div>
         <button class="bigbtn trial" id="startTrialBtn">🧪 試しモード</button>
         <div style="font-size:11px;color:#a06a40;margin-top:4px">ボールや特殊コインをその場で自由に獲得できる練習用モード。コインも尽きません</div>
       </div>
@@ -257,8 +266,10 @@ function mkCoin(type,x,y,tier){
   return {type, d, x, y, vx:0, vy:0, r:d.r, tier, state:"live",
           dropT:0, fallT:0, fallZone:null, hopT:1+Math.random(), fuse:-1, spin:Math.random()*6.28};
 }
+const ZONE_HALF_BY_DIFFICULTY={easy:110, normal:95, hard:80};
 function zones(){
-  const half=80+S.up.zone*28;
+  const baseHalf=S.mode==="endless" ? (ZONE_HALF_BY_DIFFICULTY[S.difficulty]||95) : 95;
+  const half=baseHalf+S.up.zone*28;
   return {sL:Math.max(WALL_L,CX-half), sR:Math.min(WALL_R,CX+half), jL:CX-20, jR:CX+20};
 }
 function pusherFront(t){
@@ -308,9 +319,10 @@ function checkDailyBonus(save){
 }
 window.addEventListener("beforeunload",()=>{ if(S&&S.mode==="endless") saveEndlessProgress(); });
 
-function newGame(mode){
+function newGame(mode,difficulty){
   S={
     mode: mode||"stage",
+    difficulty: difficulty||"normal",
     phase:"play", round:1, score:0, target:targetFor(1),
     tickets:0, stock:30, inv:{gold:0,bomb:1,rabbit:0,magnet:0,big:0,split:0},
     sel:"normal", coins:[], parts:[], floats:[],
@@ -384,6 +396,7 @@ function tryDrop(x){
   S.coins.push(c);
   S.dropCd=0.34;
   SND.drop();
+  hitTowerIfStanding();
   refreshUI(); sbDirty=true;
 }
 function autoSelect(){
@@ -751,15 +764,31 @@ function spawnBall(){
   c.state="drop"; c.dropT=0.32;
   S.coins.push(c);
 }
-const TOWER_TOTAL=200;      // タワー崩壊後に実際に投入されるコインの合計枚数
+const TOWER_TOTAL=200;       // タワー崩壊後に実際に投入されるコインの合計枚数
+const TOWER_BLOCKS=8;        // タワーの段数＝倒すのに必要な投入回数
 function spawnMedalTower(){
-  S.towerVisual={ phase:"rising", t:0 };  // まず視覚的なタワーを積み上げてから崩す
+  // タワーが積み上がって「立ったまま」待機し、プレイヤーがコインを投入するたびに1段ずつ崩れていく
+  S.towerVisual={ phase:"rising", t:0, blocksRemaining:TOWER_BLOCKS };
+}
+// プレイヤーがコインを投入するたびに呼ばれる：立っているタワーがあれば1段崩す
+function hitTowerIfStanding(){
+  const tv=S.towerVisual;
+  if(!tv||tv.phase!=="standing") return;
+  tv.blocksRemaining--;
+  S.shake=Math.max(S.shake,5);
+  SND.hop();
+  if(tv.blocksRemaining<=0){
+    tv.phase="toppling"; tv.t=0;
+    S.shake=14; SND.boom();
+  }
 }
 function updateTowerVisual(dt){
   const tv=S.towerVisual;
   tv.t+=dt;
-  if(tv.phase==="rising"&&tv.t>=0.75){ tv.phase="hold"; tv.t=0; }
-  else if(tv.phase==="hold"&&tv.t>=0.35){ tv.phase="toppling"; tv.t=0; S.shake=14; SND.boom(); }
+  if(tv.phase==="rising"){
+    const riseDur=TOWER_BLOCKS*0.16;
+    if(tv.t>=riseDur){ tv.phase="standing"; tv.t=0; }
+  }
   else if(tv.phase==="toppling"&&tv.t>=0.55){
     S.towerVisual=null;
     S.towerLeft=TOWER_TOTAL; S.towerTimer=0;
@@ -1365,7 +1394,9 @@ function coinY(c){
 }
 // JP当選時の「タワー崩し」演出用の3Dオブジェクト（物理シミュレーションのコインとは別に一時表示する見た目だけの塔）
 let towerGroup=null;
-const TOWER_VIS_COUNT=26;
+const towerBlockGeo=new THREE.CylinderGeometry(0.55,0.55,0.34,20);
+const towerBlockMat=new THREE.MeshStandardMaterial({color:0xffd94d, emissive:0xff9d00, emissiveIntensity:0.7, roughness:0.25, metalness:0.55});
+const TOWER_BLOCK_H=0.36;
 function syncTowerVisual(){
   if(!S||!S.towerVisual){
     if(towerGroup){ world.remove(towerGroup); towerGroup=null; }
@@ -1374,30 +1405,32 @@ function syncTowerVisual(){
   const tv=S.towerVisual;
   if(!towerGroup){
     towerGroup=new THREE.Group();
-    for(let i=0;i<TOWER_VIS_COUNT;i++){
-      const m=new THREE.Mesh(coinGeos.normal, coinMats.normal);
+    for(let i=0;i<TOWER_BLOCKS;i++){
+      const m=new THREE.Mesh(towerBlockGeo, towerBlockMat);
       m.castShadow=true; m.receiveShadow=true;
       m.visible=false;
       towerGroup.add(m);
     }
-    towerGroup.position.set(sx(CX), 0, sz(300));
+    // 台の上、コインの山より高い位置に大きく目立つ場所へ設置する
+    towerGroup.position.set(sx(CX), 2.7, sz(300));
     world.add(towerGroup);
   }
+  for(let i=0;i<TOWER_BLOCKS;i++){
+    towerGroup.children[i].position.set(0, i*TOWER_BLOCK_H, 0);
+  }
   if(tv.phase==="rising"){
-    const p=Math.min(1,tv.t/0.75);
-    const visCount=Math.ceil(p*TOWER_VIS_COUNT);
-    for(let i=0;i<TOWER_VIS_COUNT;i++){
-      const m=towerGroup.children[i];
-      m.visible=i<visCount;
-      m.position.set(0, i*COIN_H*1.05, 0);
-      m.rotation.set(0, i*0.6, 0);
-    }
+    const riseDur=TOWER_BLOCKS*0.16;
+    const p=Math.min(1,tv.t/riseDur);
+    const visCount=Math.ceil(p*TOWER_BLOCKS);
+    for(let i=0;i<TOWER_BLOCKS;i++) towerGroup.children[i].visible=i<visCount;
+    towerGroup.rotation.x=0; towerGroup.rotation.z=0;
+  }else if(tv.phase==="standing"){
+    for(let i=0;i<TOWER_BLOCKS;i++) towerGroup.children[i].visible=i<tv.blocksRemaining;
     towerGroup.rotation.x=0;
-  }else if(tv.phase==="hold"){
-    for(let i=0;i<TOWER_VIS_COUNT;i++) towerGroup.children[i].visible=true;
-    towerGroup.rotation.x=0;
+    towerGroup.rotation.z=Math.sin(S.t*3)*0.025;   // 目を引くよう常にわずかに揺れる
   }else if(tv.phase==="toppling"){
     const p=Math.min(1,tv.t/0.55);
+    towerGroup.rotation.z=0;
     towerGroup.rotation.x=p*(Math.PI/2.05);   // 手前(プレイヤー側)へ倒れ込む
   }
 }
@@ -1545,6 +1578,7 @@ buildCoinBtns();
 
 const comboBox=document.getElementById("comboBox");
 const warnBox=document.getElementById("warnBox");
+const towerBox=document.getElementById("towerBox");
 function syncHud(){
   if(S&&S.combo>=2&&S.phase==="play"){
     comboBox.style.display="block";
@@ -1555,6 +1589,10 @@ function syncHud(){
     warnBox.style.display="block";
     warnBox.textContent=`⚠ コイン切れ！ あと ${Math.ceil(S.outT)} 秒…`;
   }else warnBox.style.display="none";
+  if(S&&S.towerVisual&&S.towerVisual.phase==="standing"){
+    towerBox.style.display="block";
+    towerBox.querySelector(".t2").textContent=`コインを投入して倒そう（残り${S.towerVisual.blocksRemaining}段）`;
+  }else towerBox.style.display="none";
 }
 
 /* ================= 入力 ================= */
@@ -1596,12 +1634,14 @@ document.getElementById("startStageBtn").onclick=()=>{
   newGame("stage");
   buildZoneStrips();
 };
-document.getElementById("startEndlessBtn").onclick=()=>{
-  ensureAC();
-  document.getElementById("titleOv").style.display="none";
-  newGame("endless");
-  buildZoneStrips();
-};
+for(const [id,diff] of [["startEndlessEasyBtn","easy"],["startEndlessNormalBtn","normal"],["startEndlessHardBtn","hard"]]){
+  document.getElementById(id).onclick=()=>{
+    ensureAC();
+    document.getElementById("titleOv").style.display="none";
+    newGame("endless",diff);
+    buildZoneStrips();
+  };
+}
 document.getElementById("startTrialBtn").onclick=()=>{
   ensureAC();
   document.getElementById("titleOv").style.display="none";
@@ -1611,7 +1651,7 @@ document.getElementById("startTrialBtn").onclick=()=>{
 document.getElementById("nextBtn").onclick=nextRound;
 document.getElementById("retryBtn").onclick=()=>{
   document.getElementById("overOv").style.display="none";
-  newGame(S.mode);
+  newGame(S.mode,S.difficulty);
   buildZoneStrips();
 };
 document.getElementById("muteBtn").onclick=function(){
