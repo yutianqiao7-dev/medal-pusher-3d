@@ -209,10 +209,14 @@
   </div>
 </div>
 <script type="importmap">
-{ "imports": { "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js" } }
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+  "cannon-es": "https://cdn.jsdelivr.net/npm/cannon-es@0.20.0/dist/cannon-es.js"
+} }
 </script>
 <script type="module">
 import * as THREE from 'three';
+import * as CANNON from 'cannon-es';
 "use strict";
 
 /* ================= シミュレーション定数（2D版と同一の検証済みロジック） ================= */
@@ -767,10 +771,11 @@ function spawnBall(){
 const TOWER_TOTAL=200;       // タワー崩壊後に実際に投入されるコインの合計枚数
 const TOWER_BLOCKS=8;        // タワーの段数＝倒すのに必要な投入回数
 function spawnMedalTower(){
-  // タワーが積み上がって「立ったまま」待機し、プレイヤーがコインを投入するたびに1段ずつ崩れていく
-  S.towerVisual={ phase:"rising", t:0, blocksRemaining:TOWER_BLOCKS };
+  // 実物のコインが台の上に積み上がって「立ったまま」待機し、プレイヤーがコインを投入するたびに
+  // 1段ずつ物理的に弾き飛ばされ、最後の1段で残り全体が本物の物理演算で手前に倒れ込む
+  S.towerVisual={ phase:"rising", t:0, blocksRemaining:TOWER_BLOCKS, prevRemaining:TOWER_BLOCKS };
 }
-// プレイヤーがコインを投入するたびに呼ばれる：立っているタワーがあれば1段崩す
+// プレイヤーがコインを投入するたびに呼ばれる：立っているタワーがあれば1段崩す（実際の弾き飛ばしはレンダー側の物理演算で処理）
 function hitTowerIfStanding(){
   const tv=S.towerVisual;
   if(!tv||tv.phase!=="standing") return;
@@ -789,7 +794,8 @@ function updateTowerVisual(dt){
     const riseDur=TOWER_BLOCKS*0.16;
     if(tv.t>=riseDur){ tv.phase="standing"; tv.t=0; }
   }
-  else if(tv.phase==="toppling"&&tv.t>=0.55){
+  else if(tv.phase==="toppling"&&tv.t>=1.8){
+    // 物理シミュレーションが十分落ち着くまで待ってから本来の報酬コインを投入する
     S.towerVisual=null;
     S.towerLeft=TOWER_TOTAL; S.towerTimer=0;
     burst3D(CX,300,0xffd94d,50);
@@ -1392,46 +1398,119 @@ function coinY(c){
   if(c.tier===1) return PUSH_TOP+COIN_H/2;
   return COIN_H/2;
 }
-// JP当選時の「タワー崩し」演出用の3Dオブジェクト（物理シミュレーションのコインとは別に一時表示する見た目だけの塔）
-let towerGroup=null;
-const towerBlockGeo=new THREE.CylinderGeometry(0.55,0.55,0.34,20);
-const towerBlockMat=new THREE.MeshStandardMaterial({color:0xffd94d, emissive:0xff9d00, emissiveIntensity:0.7, roughness:0.25, metalness:0.55});
-const TOWER_BLOCK_H=0.36;
+// JP当選時の「タワー崩し」演出：台の上に実物のコインと同じ形・同じ高さで積み上がり、
+// 崩れる時はcannon-esによる本物の剛体物理演算で手前に倒れ込む（アニメーションによる見せかけの回転ではない）
+const TOWER_R=TYPES.normal.r*K;                 // 実際の台コインと同じ半径
+const COINS_PER_LAYER=4;                        // 1段(1ヒット)あたりの積層コイン枚数
+const TOWER_DISCS=TOWER_BLOCKS*COINS_PER_LAYER; // 積み上げる物理コインの総数
+const towerCoinMat=coinMats.normal.map(m=>{
+  const c=m.clone();
+  c.emissive=new THREE.Color(0xff9d00);
+  c.emissiveIntensity=0.6;
+  return c;
+});
+let towerPhys=null;   // { world, stack:[{body,mesh}], debris:[{body,mesh,t}] }
+function ensureTowerPhys(){
+  if(towerPhys) return towerPhys;
+  const w=new CANNON.World({gravity:new CANNON.Vec3(0,-24,0)});
+  w.broadphase=new CANNON.NaiveBroadphase();
+  w.solver.iterations=8;
+  const groundMat=new CANNON.Material("towerGround");
+  const coinMatPhys=new CANNON.Material("towerCoin");
+  const groundBody=new CANNON.Body({mass:0, shape:new CANNON.Plane(), material:groundMat});
+  groundBody.quaternion.setFromAxisAngle(new CANNON.Vec3(1,0,0), -Math.PI/2);
+  w.addBody(groundBody);
+  w.addContactMaterial(new CANNON.ContactMaterial(groundMat, coinMatPhys, {friction:0.55, restitution:0.15}));
+  w.addContactMaterial(new CANNON.ContactMaterial(coinMatPhys, coinMatPhys, {friction:0.4, restitution:0.1}));
+  towerPhys={world:w, coinMatPhys, stack:[], debris:[]};
+  return towerPhys;
+}
+function buildTowerStack(baseX, baseZ){
+  const tp=ensureTowerPhys();
+  for(let i=0;i<TOWER_DISCS;i++){
+    const jx=(Math.random()-0.5)*0.04, jz=(Math.random()-0.5)*0.04;
+    const body=new CANNON.Body({mass:1, shape:new CANNON.Cylinder(TOWER_R,TOWER_R,COIN_H,16), material:tp.coinMatPhys});
+    body.type=CANNON.Body.KINEMATIC;
+    body.position.set(baseX+jx, i*COIN_H+COIN_H/2, baseZ+jz);
+    tp.world.addBody(body);
+    const mesh=new THREE.Mesh(coinGeos.normal, towerCoinMat);
+    mesh.castShadow=true; mesh.receiveShadow=true;
+    mesh.visible=false;
+    mesh.position.copy(body.position);
+    world.add(mesh);
+    tp.stack.push({body,mesh});
+  }
+}
+function clearTowerPhys(){
+  if(!towerPhys) return;
+  for(const s of towerPhys.stack){ world.remove(s.mesh); towerPhys.world.removeBody(s.body); }
+  for(const d of towerPhys.debris){ world.remove(d.mesh); towerPhys.world.removeBody(d.body); }
+  towerPhys=null;
+}
+// 1ヒットぶん、タワー最上段のコインを実際に物理演算オブジェクトへ切り替えて弾き飛ばす
+function knockOffLayer(n){
+  const tp=towerPhys; if(!tp) return;
+  for(let k=0;k<n && tp.stack.length;k++){
+    const s=tp.stack.pop();
+    s.body.type=CANNON.Body.DYNAMIC;
+    s.body.wakeUp();
+    s.body.velocity.set((Math.random()-0.5)*3, 2+Math.random()*2, 1.5+Math.random()*2);
+    s.body.angularVelocity.set((Math.random()-0.5)*6,(Math.random()-0.5)*6,(Math.random()-0.5)*6);
+    s.t=0;
+    tp.debris.push(s);
+  }
+}
+// 最後のヒットで残り全部を本物の物理演算で手前へ倒す（スクリプトによる回転ではなく重力・衝突による自然な崩壊）
+function collapseRemaining(){
+  const tp=towerPhys; if(!tp) return;
+  while(tp.stack.length){
+    const s=tp.stack.pop();
+    s.body.type=CANNON.Body.DYNAMIC;
+    s.body.wakeUp();
+    s.body.velocity.set((Math.random()-0.5)*2, 1+Math.random(), 4+Math.random()*3);
+    s.body.angularVelocity.set((Math.random()-0.5)*8,(Math.random()-0.5)*4,(Math.random()-0.5)*8);
+    s.t=0;
+    tp.debris.push(s);
+  }
+}
 function syncTowerVisual(){
   if(!S||!S.towerVisual){
-    if(towerGroup){ world.remove(towerGroup); towerGroup=null; }
+    if(towerPhys) clearTowerPhys();
     return;
   }
   const tv=S.towerVisual;
-  if(!towerGroup){
-    towerGroup=new THREE.Group();
-    for(let i=0;i<TOWER_BLOCKS;i++){
-      const m=new THREE.Mesh(towerBlockGeo, towerBlockMat);
-      m.castShadow=true; m.receiveShadow=true;
-      m.visible=false;
-      towerGroup.add(m);
-    }
-    // 台の上、コインの山より高い位置に大きく目立つ場所へ設置する
-    towerGroup.position.set(sx(CX), 2.7, sz(300));
-    world.add(towerGroup);
+  if(!towerPhys){
+    buildTowerStack(sx(CX), sz(300));
   }
-  for(let i=0;i<TOWER_BLOCKS;i++){
-    towerGroup.children[i].position.set(0, i*TOWER_BLOCK_H, 0);
-  }
+  const tp=towerPhys;
   if(tv.phase==="rising"){
     const riseDur=TOWER_BLOCKS*0.16;
     const p=Math.min(1,tv.t/riseDur);
-    const visCount=Math.ceil(p*TOWER_BLOCKS);
-    for(let i=0;i<TOWER_BLOCKS;i++) towerGroup.children[i].visible=i<visCount;
-    towerGroup.rotation.x=0; towerGroup.rotation.z=0;
+    const visCount=Math.ceil(p*TOWER_DISCS);
+    for(let i=0;i<tp.stack.length;i++) tp.stack[i].mesh.visible=i<visCount;
   }else if(tv.phase==="standing"){
-    for(let i=0;i<TOWER_BLOCKS;i++) towerGroup.children[i].visible=i<tv.blocksRemaining;
-    towerGroup.rotation.x=0;
-    towerGroup.rotation.z=Math.sin(S.t*3)*0.025;   // 目を引くよう常にわずかに揺れる
+    for(const s of tp.stack) s.mesh.visible=true;
+    if(tv.prevRemaining>tv.blocksRemaining){
+      knockOffLayer((tv.prevRemaining-tv.blocksRemaining)*COINS_PER_LAYER);
+      tv.prevRemaining=tv.blocksRemaining;
+    }
   }else if(tv.phase==="toppling"){
-    const p=Math.min(1,tv.t/0.55);
-    towerGroup.rotation.z=0;
-    towerGroup.rotation.x=p*(Math.PI/2.05);   // 手前(プレイヤー側)へ倒れ込む
+    if(!tv.collapsed){ collapseRemaining(); tv.collapsed=true; }
+  }
+  // 立っている段は静止したまま、弾け飛んだ/崩れたコインだけがcannon-esで実際に物理演算される
+  if(tp.stack.length||tp.debris.length){
+    tp.world.step(1/60, FRAME_DT, 10);
+  }
+  for(const s of tp.stack) s.mesh.position.copy(s.body.position);
+  for(let i=tp.debris.length-1;i>=0;i--){
+    const d=tp.debris[i];
+    d.t+=FRAME_DT;
+    d.mesh.position.copy(d.body.position);
+    d.mesh.quaternion.copy(d.body.quaternion);
+    if(d.t>2.2||d.body.position.y<-4){
+      world.remove(d.mesh); tp.world.removeBody(d.body);
+      tp.debris.splice(i,1);
+    }
   }
 }
 function syncCoins(){
@@ -1676,6 +1755,7 @@ document.getElementById("adminBtn").onclick=()=>{
 
 /* ================= メインループ ================= */
 let last=performance.now(), sbTimer=0;
+let FRAME_DT=1/60;   // 物理演算(cannon-es)のステップに使う直近フレームのdt
 function render3D(){
   if(S){
     // プッシャー位置
@@ -1711,6 +1791,7 @@ function render3D(){
 function loop(now){
   const dt=Math.min(1/30,(now-last)/1000);
   last=now;
+  FRAME_DT=dt;
   if(S&&S.phase==="play"&&holding) tryDrop(S.aimX);
   update(dt);
   render3D();
