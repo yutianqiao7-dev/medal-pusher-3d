@@ -29,6 +29,9 @@
   #prog { height:100%; width:0%; background:linear-gradient(90deg,#f39c12,#e74c3c); transition:width .2s; }
   #coinBtns { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
   #miniShop { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  #trialBtns { display:grid; grid-template-columns:1fr 1fr; gap:6px; }
+  .tbtn { padding:7px; background:#e3f7ea; border:2px solid #6fbf8f; border-radius:10px; cursor:pointer; font-size:11.5px; color:#1e5c38; text-align:center; font-family:inherit; touch-action:manipulation; font-weight:bold; }
+  @media (hover:hover) and (pointer:fine){ .tbtn:hover{ background:#c9f0d6; } }
   .mbtn { position:relative; padding:6px 22px 6px 7px; background:#ffe9c7; border:2px solid #d8a468; border-radius:10px; cursor:pointer; font-size:11.5px; color:#5a341c; text-align:left; font-family:inherit; touch-action:manipulation; }
   @media (hover:hover) and (pointer:fine){ .mbtn:hover:not(:disabled) { background:#ffdda6; } }
   .mbtn:disabled { opacity:.35; cursor:not-allowed; }
@@ -47,6 +50,7 @@
   .modal p { font-size:13px; color:#6b4226; line-height:1.9; }
   .bigbtn { margin-top:16px; padding:14px 36px; min-height:48px; font-size:17px; font-weight:bold; color:#fff; background:linear-gradient(180deg,#e74c3c,#c0392b); border:3px solid #8e2a1c; border-radius:32px; cursor:pointer; box-shadow:0 5px 16px rgba(192,57,43,.5); touch-action:manipulation; }
   .bigbtn.alt { background:linear-gradient(180deg,#3498db,#2166a3); border-color:#194a75; box-shadow:0 5px 16px rgba(33,102,163,.5); }
+  .bigbtn.trial { background:linear-gradient(180deg,#2ecc71,#1e8f4e); border-color:#155c33; box-shadow:0 5px 16px rgba(30,143,78,.5); font-size:15px; padding:11px 30px; min-height:44px; }
   @media (hover:hover) and (pointer:fine){ .bigbtn:hover { filter:brightness(1.1); } }
   .shopGrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0 4px; }
   .shopItem { background:#ffe9c7; border:2px solid #d8a468; border-radius:12px; padding:10px; text-align:left; }
@@ -129,6 +133,8 @@
         <div style="font-size:11px;color:#a06a40;margin-top:4px">目標スコアを達成してラウンドを進め、チケットで強化を購入</div>
         <button class="bigbtn alt" id="startEndlessBtn">♾️ エンドレスモード</button>
         <div style="font-size:11px;color:#a06a40;margin-top:4px">手前に落ちたコインがそのまま獲得に。中央ゾーンで奥のモニターが液晶抽選、玉が3つ落ちたらクルーンでJPチャレンジ！進捗は自動保存され、日をまたぐとログインボーナスも！</div>
+        <button class="bigbtn trial" id="startTrialBtn">🧪 試しモード</button>
+        <div style="font-size:11px;color:#a06a40;margin-top:4px">ボールや特殊コインをその場で自由に獲得できる練習用モード。コインも尽きません</div>
       </div>
     </div>
     <div class="overlay" id="shopOv" style="display:none">
@@ -181,6 +187,10 @@
     <div class="panel" id="panelMiniShop">
       <div style="font-size:12px;color:#8a5a3a;margin-bottom:8px">🎫 チケットでコイン購入（プレイ中いつでも）</div>
       <div id="miniShop"></div>
+    </div>
+    <div class="panel" id="panelTrial" style="display:none">
+      <div style="font-size:12px;color:#1e8f4e;margin-bottom:8px">🧪 試しモード：自由に獲得</div>
+      <div id="trialBtns"></div>
     </div>
     <div class="panel hint">
       💡 <b>スコアゾーン</b>（緑）に落とすと得点。端の赤いゾーンはロスト。<br>
@@ -266,6 +276,7 @@ function applyModeUI(){
   document.getElementById("panelMiniShop").style.display=stage?"":"none";
   document.getElementById("rowBalls").style.display=stage?"none":"";
   document.getElementById("rowQueue").style.display=stage?"none":"";
+  document.getElementById("panelTrial").style.display=S.mode==="trial"?"":"none";
 }
 // ================= エンドレスモードの永続化・日替わりログインボーナス =================
 const ENDLESS_SAVE_KEY="medalPusherEndlessSave_v1";
@@ -325,6 +336,10 @@ function newGame(mode){
     S.balls=Math.min(3,save.balls||0);
     Object.assign(S.inv, save.inv||{});
     writeEndlessSave(save);
+  }else if(S.mode==="trial"){
+    // 試しモード：保存はせず、毎回たっぷりのコイン・アイテムで始める（コインも尽きない）
+    S.stock=300;
+    S.inv={gold:10,bomb:10,rabbit:10,magnet:10,big:10,split:10};
   }
   // 台を飽和密度で敷き詰める（隙間があると押し出しが発生しない）
   for(let row=0;row<12;row++){
@@ -401,8 +416,8 @@ function coinFalls(c){
     S.combo++; S.comboT=2.0+S.up.combo*0.6;
     let mult=1+(S.combo-1)*0.25;
     const jp=(c.x>=z.jL&&c.x<=z.jR);
-    const queueThis=jp&&S.mode==="endless";
-    if(jp&&!queueThis) mult*=3;   // ステージモードは従来通り即×3
+    const queueThis=jp&&S.mode!=="stage";   // エンドレス・試しモードは液晶抽選、ステージは従来通り即×3
+    if(jp&&!queueThis) mult*=3;
     const pts=Math.round(c.d.value*mult);
     c.fallZone="score";
     if(S.mode==="stage"){
@@ -572,13 +587,14 @@ function update(dt){
 
   S.coins=S.coins.filter(c=>c.state!=="dead"&&!(c.state==="fall"&&c.fallT>0.6));
 
-  if(!S.warmup){
+  if(!S.warmup&&S.mode!=="trial"){   // 試しモードはコイン切れによるゲームオーバーなし
     if(droppable()<=0){
       if(S.outT<0) S.outT=9;
       S.outT-=dt;
       if(S.outT<=0){ gameOver(); }
     }else S.outT=-1;
   }
+  if(S.mode==="trial"&&S.stock<50) S.stock=300; // 試しモードは尽きないよう自動補充
   updateFx(dt);
 }
 function updateFx(dt){
@@ -631,6 +647,35 @@ function updateMiniShop(){
     btn.disabled=!S||S.phase!=="play"||S.tickets<item.cost;
   }
 }
+// 試しモード専用：ボールや特殊コインをその場で自由に獲得できるボタン群
+const TRIAL_ACTIONS=[
+  {label:"🔵 ボール+1",    fn:()=>{ S.balls=Math.min(3,S.balls+1); if(S.balls>=3) pushEvent("jp"); }},
+  {label:"★ ゴールド+5",   fn:()=>{ S.inv.gold+=5; }},
+  {label:"💣 ボム+5",      fn:()=>{ S.inv.bomb+=5; }},
+  {label:"🐰 ウサギ+5",    fn:()=>{ S.inv.rabbit+=5; }},
+  {label:"🧲 マグネット+5", fn:()=>{ S.inv.magnet+=5; }},
+  {label:"⬛ ビッグ+5",     fn:()=>{ S.inv.big+=5; }},
+  {label:"🔀 スプリット+5", fn:()=>{ S.inv.split+=5; }},
+  {label:"🪙 コイン+300",  fn:()=>{ S.stock+=300; }},
+  {label:"🎰 液晶抽選",    fn:()=>{ pushEvent("slot"); }},
+  {label:"🎯 JPチャレンジ", fn:()=>{ pushEvent("jp"); }},
+];
+function buildTrialBtns(){
+  const wrap=document.getElementById("trialBtns");
+  for(const act of TRIAL_ACTIONS){
+    const b=document.createElement("button");
+    b.className="tbtn";
+    b.textContent=act.label;
+    b.onclick=()=>{
+      if(!S||S.mode!=="trial"||S.phase!=="play") return;
+      act.fn();
+      SND.buy();
+      refreshUI();
+    };
+    wrap.appendChild(b);
+  }
+}
+buildTrialBtns();
 /* ================= 液晶抽選（奥のモニター）・ボーナスルーレット・クルーンJPチャレンジ（エンドレスモード専用） ================= */
 // イベントキュー：液晶抽選／ボーナスルーレット／JPチャレンジをまとめて管理する。
 // busyが解けた瞬間に必ず次を拾って発火させるので、以前あった「タイミング次第でJPが発動しないまま」というバグが起きない。
@@ -651,7 +696,7 @@ function processEventQueue(){
 }
 const SLOT_SYMS=["🍒","🔔","⭐","💎","🔵"];
 function triggerSlot(){
-  if(!S||S.mode!=="endless"||S.busy) return;
+  if(!S||S.mode==="stage"||S.busy) return;
   S.busy=true;
   const roll=Math.random();
   let outcome,syms;
@@ -1142,9 +1187,9 @@ function drawNormalBoard(c){
   c.fillStyle=g; c.fillRect(0,0,640,280);
   c.strokeStyle="#ffcf6e"; c.lineWidth=8; c.strokeRect(6,6,628,268);
   c.textAlign="center";
-  if(S&&S.mode==="endless"){
+  if(S&&S.mode!=="stage"){
     c.fillStyle="#8fd0ff"; c.font="bold 30px sans-serif";
-    c.fillText("ENDLESS MODE", 320, 46);
+    c.fillText(S.mode==="trial"?"TRIAL MODE":"ENDLESS MODE", 320, 46);
     c.fillStyle="#ffe08a"; c.font="bold 56px sans-serif";
     c.fillText(`🪙 ${S.stock.toLocaleString()}`, 320, 118);
     c.fillStyle="#a9c4e8"; c.font="bold 22px sans-serif";
@@ -1414,7 +1459,7 @@ function refreshUI(){
   document.getElementById("uiTkt").textContent=S.tickets;
   document.getElementById("uiStock").textContent=S.stock;
   document.getElementById("prog").style.width=Math.min(100,S.score/S.target*100)+"%";
-  if(S.mode==="endless"){
+  if(S.mode!=="stage"){
     document.getElementById("uiScoreEndless").textContent=S.totalCoinsWon.toLocaleString();
     document.getElementById("uiBalls").textContent="●".repeat(S.balls)+"○".repeat(3-S.balls);
     { const sq=S.eventQueue.filter(e=>e==="slot").length; document.getElementById("uiQueue").textContent="●".repeat(sq)+"○".repeat(3-sq); }
@@ -1505,6 +1550,12 @@ document.getElementById("startEndlessBtn").onclick=()=>{
   newGame("endless");
   buildZoneStrips();
 };
+document.getElementById("startTrialBtn").onclick=()=>{
+  ensureAC();
+  document.getElementById("titleOv").style.display="none";
+  newGame("trial");
+  buildZoneStrips();
+};
 document.getElementById("nextBtn").onclick=nextRound;
 document.getElementById("retryBtn").onclick=()=>{
   document.getElementById("overOv").style.display="none";
@@ -1525,7 +1576,7 @@ document.getElementById("adminBtn").onclick=()=>{
   const amount=parseInt(amountStr,10);
   if(!Number.isFinite(amount)||amount<=0){ alert("正しい数値を入力してください"); return; }
   S.stock+=amount;
-  if(S.mode==="endless") S.totalCoinsWon+=amount;
+  if(S.mode!=="stage") S.totalCoinsWon+=amount;
   refreshUI(); sbDirty=true;
   SND.buy();
   alert(`コインを${amount}枚追加しました`);
