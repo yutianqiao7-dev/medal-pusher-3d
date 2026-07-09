@@ -318,7 +318,7 @@ function newGame(mode){
     dropCd:0, outT:-1, aimX:CX,
     up:{zone:0,combo:0,ticket:0,speed:0,stock:0},
     totalScore:0, warmup:false, warmFell:0,
-    balls:0, busy:false, towerLeft:0, towerTimer:0,
+    balls:0, busy:false, towerLeft:0, towerTimer:0, towerVisual:null,
     eventQueue:[], rainQueue:[], rainTimer:0,
     totalCoinsWon:0, slotAnim:null, kurun:null, ballRoulette:null,
     pendingDailyBonus:0,
@@ -475,20 +475,22 @@ function update(dt){
 
   if(S.phase!=="play"&&!S.warmup){ updateFx(dt); return; }
 
-  // JP当選後の「メダルタワー崩し」演出：スコアゾーン手前にコインを降らせて、そのまま雪崩れ落とす
+  // JP当選：まず視覚的な「タワー」が積み上がって崩れる演出をして、崩れた瞬間に実コインを投入する
+  if(S.towerVisual) updateTowerVisual(dt);
+  // タワー崩壊後：スコアゾーン手前にコインを一気に降らせて、そのまま雪崩れ落とす
   // （奥から入れると密集した山を何分も押し出す必要があり実質もらえないため、前方に直接投下する）
   if(S.towerLeft>0){
     S.towerTimer-=dt;
     if(S.towerTimer<=0){
-      S.towerTimer=0.06;
-      const n=Math.min(3,S.towerLeft);
+      S.towerTimer=0.04;
+      const n=Math.min(6,S.towerLeft);
       for(let i=0;i<n;i++){
         const x=WALL_L+20+Math.random()*(WALL_R-WALL_L-40);
-        const y=380+Math.random()*140;
+        const y=340+Math.random()*160;
         const c=mkCoin("normal", x, y, 2);
-        c.state="drop"; c.dropT=0.28+Math.random()*0.15;
-        c.vy=200+Math.random()*120;      // 着地後すぐ前方へ押し出されるよう初速を持たせる
-        c.vx=(Math.random()-0.5)*60;
+        c.state="drop"; c.dropT=0.22+Math.random()*0.15;
+        c.vy=220+Math.random()*140;      // 着地後すぐ前方へ押し出されるよう初速を持たせる
+        c.vx=(Math.random()-0.5)*70;
         S.coins.push(c);
       }
       S.towerLeft-=n;
@@ -749,8 +751,20 @@ function spawnBall(){
   c.state="drop"; c.dropT=0.32;
   S.coins.push(c);
 }
+const TOWER_TOTAL=200;      // タワー崩壊後に実際に投入されるコインの合計枚数
 function spawnMedalTower(){
-  S.towerLeft=90; S.towerTimer=0;
+  S.towerVisual={ phase:"rising", t:0 };  // まず視覚的なタワーを積み上げてから崩す
+}
+function updateTowerVisual(dt){
+  const tv=S.towerVisual;
+  tv.t+=dt;
+  if(tv.phase==="rising"&&tv.t>=0.75){ tv.phase="hold"; tv.t=0; }
+  else if(tv.phase==="hold"&&tv.t>=0.35){ tv.phase="toppling"; tv.t=0; S.shake=14; SND.boom(); }
+  else if(tv.phase==="toppling"&&tv.t>=0.55){
+    S.towerVisual=null;
+    S.towerLeft=TOWER_TOTAL; S.towerTimer=0;
+    burst3D(CX,300,0xffd94d,50);
+  }
 }
 // コインの雨：種類ごとにキューへ積み、いつもの投入エリア付近から1枚ずつ降らせる
 function spawnTypedRain(type,n){
@@ -1349,6 +1363,44 @@ function coinY(c){
   if(c.tier===1) return PUSH_TOP+COIN_H/2;
   return COIN_H/2;
 }
+// JP当選時の「タワー崩し」演出用の3Dオブジェクト（物理シミュレーションのコインとは別に一時表示する見た目だけの塔）
+let towerGroup=null;
+const TOWER_VIS_COUNT=26;
+function syncTowerVisual(){
+  if(!S||!S.towerVisual){
+    if(towerGroup){ world.remove(towerGroup); towerGroup=null; }
+    return;
+  }
+  const tv=S.towerVisual;
+  if(!towerGroup){
+    towerGroup=new THREE.Group();
+    for(let i=0;i<TOWER_VIS_COUNT;i++){
+      const m=new THREE.Mesh(coinGeos.normal, coinMats.normal);
+      m.castShadow=true; m.receiveShadow=true;
+      m.visible=false;
+      towerGroup.add(m);
+    }
+    towerGroup.position.set(sx(CX), 0, sz(300));
+    world.add(towerGroup);
+  }
+  if(tv.phase==="rising"){
+    const p=Math.min(1,tv.t/0.75);
+    const visCount=Math.ceil(p*TOWER_VIS_COUNT);
+    for(let i=0;i<TOWER_VIS_COUNT;i++){
+      const m=towerGroup.children[i];
+      m.visible=i<visCount;
+      m.position.set(0, i*COIN_H*1.05, 0);
+      m.rotation.set(0, i*0.6, 0);
+    }
+    towerGroup.rotation.x=0;
+  }else if(tv.phase==="hold"){
+    for(let i=0;i<TOWER_VIS_COUNT;i++) towerGroup.children[i].visible=true;
+    towerGroup.rotation.x=0;
+  }else if(tv.phase==="toppling"){
+    const p=Math.min(1,tv.t/0.55);
+    towerGroup.rotation.x=p*(Math.PI/2.05);   // 手前(プレイヤー側)へ倒れ込む
+  }
+}
 function syncCoins(){
   const alive=new Set();
   for(const c of S.coins){
@@ -1611,6 +1663,7 @@ function render3D(){
     syncParts();
     syncFloats();
     syncHud();
+    syncTowerVisual();
     if(sbDirty||S.combo>=2){ drawScoreboard(); sbDirty=false; }
   }
   renderer.render(scene, camera);
