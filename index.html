@@ -65,6 +65,7 @@
   .tkt { color:#1d8fb0; font-weight:bold; }
   #muteBtn { position:absolute; top:max(10px,env(safe-area-inset-top)); right:max(10px,env(safe-area-inset-right)); z-index:12; width:40px; height:40px; border-radius:50%; border:2px solid #b3592b; background:rgba(255,243,221,.9); color:#5a341c; cursor:pointer; font-size:16px; touch-action:manipulation; }
   #adminBtn { position:absolute; top:max(10px,env(safe-area-inset-top)); right:calc(max(10px,env(safe-area-inset-right)) + 48px); z-index:12; width:40px; height:40px; border-radius:50%; border:2px solid #6a6a6a; background:rgba(230,230,230,.55); color:#4a4a4a; cursor:pointer; font-size:15px; opacity:.5; touch-action:manipulation; }
+  #homeBtn { position:absolute; top:max(10px,env(safe-area-inset-top)); left:max(10px,env(safe-area-inset-left)); z-index:12; width:40px; height:40px; border-radius:50%; border:2px solid #b3592b; background:rgba(255,243,221,.9); color:#5a341c; cursor:pointer; font-size:16px; touch-action:manipulation; }
   @media (hover:hover) and (pointer:fine){ #adminBtn:hover{ opacity:1; } }
 
   /* ==== 液晶（LCD）演出：スロット風の抽選ボックス ==== */
@@ -89,6 +90,8 @@
   .lcdTitle.jp { color:#ff8a5c; text-shadow:0 0 10px rgba(255,138,92,.8); font-size:19px; }
   .lcdResult { margin-top:14px; min-height:28px; font-size:18px; font-weight:900; color:#7dffb0; text-shadow:0 0 8px rgba(125,255,176,.6); }
   .kurunCanvas { width:100%; max-width:280px; aspect-ratio:1; background:#050403; border:3px solid #3a2a18; border-radius:50%; margin:8px auto 0; display:block; box-shadow:inset 0 0 20px rgba(0,0,0,.8); }
+  .jpField { width:100%; max-width:300px; aspect-ratio:1; background:#050403; border:3px solid #3a2a18; border-radius:14px; margin:8px auto 0; display:block; box-shadow:inset 0 0 20px rgba(0,0,0,.8); }
+  .saveInfo { display:block; font-size:10px; font-weight:normal; color:#e8f4ff; opacity:.85; margin-top:2px; min-height:12px; }
 
   /* ==== スマホ・タブレット向けレイアウト（縦画面：筐体を上、パネルを下にスタック） ==== */
   @media (max-width:960px){
@@ -126,6 +129,7 @@
     <div id="towerBox"><div class="t1">🏆 メダルタワー出現！</div><div class="t2">コインをぶつけて自力で崩そう！</div></div>
     <button id="muteBtn" title="サウンド切替">🔊</button>
     <button id="adminBtn" title="管理者メニュー">🔧</button>
+    <button id="homeBtn" title="ホームへ戻る" style="display:none">🏠</button>
     <div class="overlay" id="titleOv">
       <div class="modal">
         <h1>🎪 メダルラッシュ<br>ローグライク 3D</h1>
@@ -137,11 +141,11 @@
         <div style="font-size:11px;color:#a06a40;margin-top:4px">目標スコアを達成してラウンドを進め、チケットで強化を購入</div>
         <div style="font-size:13px;color:#3498db;font-weight:bold;margin-top:14px">♾️ エンドレスモード（難易度を選択）</div>
         <div style="display:flex;gap:6px;margin-top:6px">
-          <button class="bigbtn alt" id="startEndlessEasyBtn" style="flex:1;padding:10px 4px;font-size:13px;margin-top:0">簡単</button>
-          <button class="bigbtn alt" id="startEndlessNormalBtn" style="flex:1;padding:10px 4px;font-size:13px;margin-top:0">普通</button>
-          <button class="bigbtn alt" id="startEndlessHardBtn" style="flex:1;padding:10px 4px;font-size:13px;margin-top:0">難しい</button>
+          <button class="bigbtn alt" id="startEndlessEasyBtn" style="flex:1;padding:10px 4px;font-size:13px;margin-top:0">簡単<span class="saveInfo" id="saveInfoEasy"></span></button>
+          <button class="bigbtn alt" id="startEndlessNormalBtn" style="flex:1;padding:10px 4px;font-size:13px;margin-top:0">普通<span class="saveInfo" id="saveInfoNormal"></span></button>
+          <button class="bigbtn alt" id="startEndlessHardBtn" style="flex:1;padding:10px 4px;font-size:13px;margin-top:0">難しい<span class="saveInfo" id="saveInfoHard"></span></button>
         </div>
-        <div style="font-size:11px;color:#a06a40;margin-top:4px">手前に落ちたコインがそのまま獲得に。難易度が上がるほどスコアゾーンが狭くなります。中央ゾーンで奥のモニターが液晶抽選、玉が3つ落ちたらクルーンでJPチャレンジ！進捗は自動保存され、日をまたぐとログインボーナスも！</div>
+        <div style="font-size:11px;color:#a06a40;margin-top:4px">手前に落ちたコインがそのまま獲得に。難易度が上がるほどスコアゾーンが狭くなります。中央ゾーンで奥のモニターが液晶抽選、玉が3つ落ちたらバンパー抽選のJPチャレンジ！難易度ごとに進捗を自動保存、日をまたぐとログインボーナスも！</div>
         <button class="bigbtn trial" id="startTrialBtn">🧪 試しモード</button>
         <div style="font-size:11px;color:#a06a40;margin-top:4px">ボールや特殊コインをその場で自由に獲得できる練習用モード。コインも尽きません</div>
       </div>
@@ -164,8 +168,8 @@
     <div class="overlay" id="jpOv" style="display:none">
       <div class="lcdBox jp">
         <div class="lcdLights"></div>
-        <div class="lcdTitle jp">🎯 クルーン JPチャレンジ 🎯</div>
-        <canvas id="kurunCanvas" width="320" height="320" class="kurunCanvas"></canvas>
+        <div class="lcdTitle jp">🎯 スマッシュ JPチャレンジ 🎯</div>
+        <canvas id="kurunCanvas" width="320" height="320" class="jpField"></canvas>
         <div class="lcdResult" id="jpResult">&nbsp;</div>
       </div>
     </div>
@@ -293,24 +297,35 @@ function applyModeUI(){
   document.getElementById("rowQueue").style.display=stage?"none":"";
   document.getElementById("panelTrial").style.display=S.mode==="trial"?"":"none";
 }
-// ================= エンドレスモードの永続化・日替わりログインボーナス =================
-const ENDLESS_SAVE_KEY="medalPusherEndlessSave_v1";
+// ================= エンドレスモードの永続化（難易度ごとに別セーブ）・日替わりログインボーナス =================
+const ENDLESS_SAVE_KEY="medalPusherEndlessSave_v1";   // 旧: 難易度共通のセーブ（移行元として参照）
+function endlessSaveKey(difficulty){ return `${ENDLESS_SAVE_KEY}_${difficulty||"normal"}`; }
 function todayStr(){
   const d=new Date();
   return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}`;
 }
-function loadEndlessSave(){
+function loadEndlessSave(difficulty){
   try{
-    const raw=localStorage.getItem(ENDLESS_SAVE_KEY);
-    return raw?JSON.parse(raw):null;
+    const raw=localStorage.getItem(endlessSaveKey(difficulty));
+    if(raw) return JSON.parse(raw);
+    // 難易度別セーブ導入前の共通セーブが残っていれば「普通」の初回ロード時に引き継ぐ
+    if((difficulty||"normal")==="normal"){
+      const legacy=localStorage.getItem(ENDLESS_SAVE_KEY);
+      if(legacy){
+        localStorage.setItem(endlessSaveKey("normal"), legacy);
+        localStorage.removeItem(ENDLESS_SAVE_KEY);
+        return JSON.parse(legacy);
+      }
+    }
+    return null;
   }catch(e){ return null; }
 }
-function writeEndlessSave(save){
-  try{ localStorage.setItem(ENDLESS_SAVE_KEY, JSON.stringify(save)); }catch(e){}
+function writeEndlessSave(save,difficulty){
+  try{ localStorage.setItem(endlessSaveKey(difficulty), JSON.stringify(save)); }catch(e){}
 }
 function saveEndlessProgress(){
   if(!S||S.mode!=="endless") return;
-  writeEndlessSave({ stock:S.stock, totalCoinsWon:S.totalCoinsWon, balls:S.balls, inv:S.inv, lastPlayDateStr:todayStr() });
+  writeEndlessSave({ stock:S.stock, totalCoinsWon:S.totalCoinsWon, balls:S.balls, inv:S.inv, lastPlayDateStr:todayStr() }, S.difficulty);
 }
 // 既存セーブがある場合のみ、日付が変わっていればコインをランダムでプレゼントする
 function checkDailyBonus(save){
@@ -341,7 +356,7 @@ function newGame(mode,difficulty){
   };
   applyModeUI();
   if(S.mode==="endless"){
-    let save=loadEndlessSave();
+    let save=loadEndlessSave(S.difficulty);
     if(!save){
       save={ stock:S.stock, totalCoinsWon:0, balls:0, inv:Object.assign({},S.inv), lastPlayDateStr:todayStr() };
     }else{
@@ -351,7 +366,7 @@ function newGame(mode,difficulty){
     S.totalCoinsWon=save.totalCoinsWon||0;
     S.balls=Math.min(3,save.balls||0);
     Object.assign(S.inv, save.inv||{});
-    writeEndlessSave(save);
+    writeEndlessSave(save, S.difficulty);
   }else if(S.mode==="trial"){
     // 試しモード：保存はせず、毎回たっぷりのコイン・アイテムで始める（コインも尽きない）
     S.stock=300;
@@ -885,29 +900,37 @@ function drawBallRoulette(br){
   c.strokeStyle="#8e2a1c"; c.lineWidth=2; c.stroke();
 }
 
-// クルーン（回転する円盤の穴に玉が入るせめぎ合い抽選）でJPチャレンジの報酬を決定
-const KURUN_POCKETS=[
-  {label:"JACKPOT",col:"#ffd94d",type:"jackpot"},
-  {label:"ハズレ", col:"#4a3a2a",type:"miss"},
-  {label:"中",     col:"#ff8a5c",type:"mid"},
-  {label:"大",     col:"#ff5c5c",type:"big"},
-  {label:"ハズレ", col:"#4a3a2a",type:"miss"},
-  {label:"小",     col:"#7dffb0",type:"small"},
+// JPチャレンジ：スマッシュスタジアム風のバンパー物理抽選。
+// 玉が上から落ち、バンパーに不規則に弾かれながら下のポケットへ。入ったポケットが報酬（結果は演出ではなく物理で決まる）
+const JP_W=320, JP_H=320, JP_BALL_R=9;
+const JP_POCKETS=[   // 下段ポケット：左から。合計幅=JP_W
+  {label:"ハズレ", col:"#4a3a2a", type:"miss",    w:62},
+  {label:"小",     col:"#7dffb0", type:"small",   w:52},
+  {label:"大",     col:"#ff5c5c", type:"big",     w:46},
+  {label:"JP",     col:"#ffd94d", type:"jackpot", w:40},
+  {label:"中",     col:"#ff8a5c", type:"mid",     w:52},
+  {label:"ハズレ", col:"#4a3a2a", type:"miss",    w:68},
 ];
-function easeInOutQuad(p){ return p<0.5 ? 2*p*p : 1-Math.pow(-2*p+2,2)/2; }
+const JP_POCKET_TOP=JP_H-52;
+const JP_BUMPERS=[
+  {x:80,  y:95,  r:22}, {x:160, y:82,  r:22}, {x:240, y:95,  r:22},
+  {x:118, y:170, r:20}, {x:202, y:170, r:20},
+  {x:40,  y:140, r:13}, {x:280, y:140, r:13},
+];
+function jpPocketAt(x){
+  let acc=0;
+  for(const p of JP_POCKETS){ acc+=p.w; if(x<acc) return p; }
+  return JP_POCKETS[JP_POCKETS.length-1];
+}
 function triggerJP(){
   if(!S||S.busy) return;
   S.balls=0; S.busy=true; refreshUI();
-  const n=KURUN_POCKETS.length;
-  const targetIdx=Math.floor(Math.random()*n);
-  const decoys=[];
-  while(decoys.length<2){
-    const d=Math.floor(Math.random()*n);
-    if(d!==targetIdx&&!decoys.includes(d)) decoys.push(d);
-  }
   S.kurun={
-    t:0, dur:4.6, targetIdx, decoys, resolved:false,
-    discSpin:(0.55+Math.random()*0.25)*(Math.random()<0.5?1:-1)
+    t:0, resolved:false, resolvedT:0, endT:0, pocket:null,
+    bx:JP_W/2+(Math.random()-0.5)*70, by:16,
+    vx:(Math.random()-0.5)*120, vy:0,
+    hits:JP_BUMPERS.map(()=>-1),   // 各バンパーの最終ヒット時刻（フラッシュ表示用）
+    sndCd:0,
   };
   document.getElementById("jpResult").textContent="";
   document.getElementById("jpOv").style.display="flex";
@@ -915,16 +938,53 @@ function triggerJP(){
 function updateKurun(dt){
   const k=S.kurun;
   k.t+=dt;
-  drawKurun(k);
-  if(k.t>=k.dur&&!k.resolved){
-    k.resolved=true;
-    const p=KURUN_POCKETS[k.targetIdx];
-    resolveKurunOutcome(p);
-    const msg = p.type==="miss" ? "残念…また玉を3つ集めよう！" : `${p.label}！`;
-    const resultEl=document.getElementById("jpResult");
-    resultEl.textContent=msg; resultEl.style.color = p.type==="miss" ? "#c9a98a" : p.col;
+  if(k.sndCd>0) k.sndCd-=dt;
+  if(!k.resolved){
+    // 2サブステップの単純な物理シミュレーション
+    for(let step=0;step<2;step++){
+      const h=dt/2;
+      k.vy+=520*h;
+      k.bx+=k.vx*h; k.by+=k.vy*h;
+      // 側壁・天井
+      if(k.bx<JP_BALL_R){ k.bx=JP_BALL_R; k.vx=Math.abs(k.vx)*0.75; }
+      if(k.bx>JP_W-JP_BALL_R){ k.bx=JP_W-JP_BALL_R; k.vx=-Math.abs(k.vx)*0.75; }
+      if(k.by<JP_BALL_R){ k.by=JP_BALL_R; k.vy=Math.abs(k.vy)*0.75; }
+      // バンパー：8秒経過後は無効化して必ず決着させる
+      if(k.t<8&&k.by<JP_POCKET_TOP-JP_BALL_R){
+        for(let i=0;i<JP_BUMPERS.length;i++){
+          const b=JP_BUMPERS[i];
+          const dx=k.bx-b.x, dy=k.by-b.y, d=Math.hypot(dx,dy), rr=b.r+JP_BALL_R;
+          if(d<rr&&d>0.01){
+            const nx=dx/d, ny=dy/d;
+            k.bx=b.x+nx*rr; k.by=b.y+ny*rr;
+            const kick=260+Math.random()*110;
+            k.vx=nx*kick+(Math.random()-0.5)*70;
+            k.vy=ny*kick;
+            k.hits[i]=k.t;
+            if(k.sndCd<=0){ SND.hop(); k.sndCd=0.09; }
+          }
+        }
+      }
+      // ポケット帯に入ったら仕切り内に閉じ込め、底に着いたら決着
+      if(k.by>JP_POCKET_TOP+JP_BALL_R){
+        const p=jpPocketAt(k.bx);
+        let acc=0; for(const q of JP_POCKETS){ if(q===p) break; acc+=q.w; }
+        if(k.bx<acc+JP_BALL_R+2){ k.bx=acc+JP_BALL_R+2; k.vx=Math.abs(k.vx)*0.4; }
+        if(k.bx>acc+p.w-JP_BALL_R-2){ k.bx=acc+p.w-JP_BALL_R-2; k.vx=-Math.abs(k.vx)*0.4; }
+        if(k.by>=JP_H-JP_BALL_R-4){
+          k.by=JP_H-JP_BALL_R-4;
+          k.resolved=true; k.resolvedT=k.t; k.pocket=p;
+          resolveKurunOutcome(p);
+          const msg = p.type==="miss" ? "残念…また玉を3つ集めよう！" : (p.type==="jackpot" ? "JACKPOT！！" : `${p.label}当たり！`);
+          const resultEl=document.getElementById("jpResult");
+          resultEl.textContent=msg; resultEl.style.color = p.type==="miss" ? "#c9a98a" : p.col;
+          break;
+        }
+      }
+    }
   }
-  if(k.resolved&&k.t>=k.dur+1.8){
+  drawKurun(k);
+  if(k.resolved&&k.t>=k.resolvedT+1.8){
     S.kurun=null;
     document.getElementById("jpOv").style.display="none";
     S.busy=false;
@@ -939,61 +999,51 @@ function resolveKurunOutcome(p){
   else { SND.over(); }
   refreshUI(); sbDirty=true;
 }
-// 玉の「せめぎ合い」動き：助走→ニアミス1→ニアミス2→本命 の4区間で、円盤に対する相対角と半径を計算
-function kurunBallPos(k){
-  const n=KURUN_POCKETS.length;
-  const baseAngle=idx=>(idx/n)*Math.PI*2-Math.PI/2;
-  const shortDelta=(from,to)=>{ let d=to-from; return ((d%(Math.PI*2))+Math.PI*3)%(Math.PI*2)-Math.PI; };
-  const p=Math.min(1,k.t/k.dur);
-  const seg=[0,0.22,0.48,0.74,1.0];
-  if(p<seg[1]){
-    const sp=p/seg[1];
-    return { relAngle:-Math.PI/2+sp*Math.PI*2*2.4, radiusFrac:0.88 };
-  }
-  if(p<seg[2]){
-    const sp=(p-seg[1])/(seg[2]-seg[1]);
-    const startA=-Math.PI/2+Math.PI*2*2.4, endA=baseAngle(k.decoys[0]);
-    return { relAngle:startA+shortDelta(startA,endA)*easeInOutQuad(sp), radiusFrac:0.88-0.55*Math.sin(Math.min(1,sp)*Math.PI) };
-  }
-  if(p<seg[3]){
-    const sp=(p-seg[2])/(seg[3]-seg[2]);
-    const startA=baseAngle(k.decoys[0]), endA=baseAngle(k.decoys[1]);
-    return { relAngle:startA+shortDelta(startA,endA)*easeInOutQuad(sp), radiusFrac:0.88-0.55*Math.sin(Math.min(1,sp)*Math.PI) };
-  }
-  const sp=(p-seg[3])/(seg[4]-seg[3]);
-  const startA=baseAngle(k.decoys[1]), endA=baseAngle(k.targetIdx);
-  return { relAngle:startA+shortDelta(startA,endA)*easeInOutQuad(sp), radiusFrac:0.88-0.60*easeInOutQuad(sp) };
-}
 function drawKurun(k){
   const cv=document.getElementById("kurunCanvas");
   const c=cv.getContext("2d");
-  const W=cv.width,H=cv.height,cx=W/2,cy=H/2,R=W/2-8;
-  c.clearRect(0,0,W,H);
-  const n=KURUN_POCKETS.length;
-  const discRot=k.t*k.discSpin;
-  for(let i=0;i<n;i++){
-    const a0=(i/n)*Math.PI*2-Math.PI/2+discRot, a1=((i+1)/n)*Math.PI*2-Math.PI/2+discRot;
-    c.beginPath(); c.moveTo(cx,cy); c.arc(cx,cy,R,a0,a1); c.closePath();
-    c.fillStyle=KURUN_POCKETS[i].col;
-    c.globalAlpha=(k.resolved&&i===k.targetIdx)?1:0.6;
-    c.fill(); c.globalAlpha=1;
-    const mid=(a0+a1)/2;
-    c.save();
-    c.translate(cx+Math.cos(mid)*R*0.68, cy+Math.sin(mid)*R*0.68);
-    c.rotate(mid+Math.PI/2);
-    c.fillStyle="#1a1410"; c.font="bold 15px sans-serif"; c.textAlign="center";
-    c.fillText(KURUN_POCKETS[i].label,0,0);
-    c.restore();
+  c.clearRect(0,0,JP_W,JP_H);
+  // 背景
+  const g=c.createLinearGradient(0,0,0,JP_H);
+  g.addColorStop(0,"#101b2e"); g.addColorStop(1,"#060a14");
+  c.fillStyle=g; c.fillRect(0,0,JP_W,JP_H);
+  // ポケット帯
+  let acc=0;
+  for(const p of JP_POCKETS){
+    const win=k.resolved&&k.pocket===p;
+    c.fillStyle=p.col;
+    c.globalAlpha=win?1:0.55;
+    c.fillRect(acc+1, JP_POCKET_TOP, p.w-2, JP_H-JP_POCKET_TOP);
+    c.globalAlpha=1;
+    if(win){ c.strokeStyle="#fff"; c.lineWidth=3; c.strokeRect(acc+1.5, JP_POCKET_TOP+1.5, p.w-3, JP_H-JP_POCKET_TOP-3); }
+    c.fillStyle="#10100c"; c.font="bold 13px sans-serif"; c.textAlign="center";
+    c.fillText(p.label, acc+p.w/2, JP_H-18);
+    // 仕切り
+    c.fillStyle="#8a97b0";
+    c.fillRect(acc-2, JP_POCKET_TOP-10, 4, JP_H-JP_POCKET_TOP+10);
+    acc+=p.w;
   }
-  c.beginPath(); c.arc(cx,cy,R*0.30,0,Math.PI*2);
-  c.fillStyle="#0d0b08"; c.fill();
-  c.strokeStyle="#6b4a2a"; c.lineWidth=3; c.stroke();
-  const {relAngle,radiusFrac}=kurunBallPos(k);
-  const angle=relAngle+discRot, radius=R*radiusFrac;
-  const bx=cx+Math.cos(angle)*radius, by=cy+Math.sin(angle)*radius;
-  c.beginPath(); c.arc(bx,by,8,0,Math.PI*2);
+  // バンパー（ヒット直後はフラッシュ）
+  for(let i=0;i<JP_BUMPERS.length;i++){
+    const b=JP_BUMPERS[i];
+    const flash=k.hits[i]>=0&&(k.t-k.hits[i])<0.16;
+    c.beginPath(); c.arc(b.x,b.y,b.r,0,Math.PI*2);
+    c.fillStyle=flash?"#ffffff":"#1d3a5f"; c.fill();
+    c.lineWidth=3; c.strokeStyle=flash?"#ffd94d":"#4d7fbf"; c.stroke();
+    c.beginPath(); c.arc(b.x,b.y,b.r*0.45,0,Math.PI*2);
+    c.fillStyle=flash?"#ffd94d":"#2e5a94"; c.fill();
+  }
+  // 8秒経過でバンパー無効のヒント
+  if(k.t>=8&&!k.resolved){
+    c.fillStyle="#c9d6ea"; c.font="bold 12px sans-serif"; c.textAlign="center";
+    c.fillText("バンパー停止…！", JP_W/2, 40);
+  }
+  // 玉
+  c.beginPath(); c.arc(k.bx,k.by,JP_BALL_R,0,Math.PI*2);
   c.fillStyle="#f0f0f0"; c.fill();
   c.strokeStyle="#888"; c.lineWidth=1.5; c.stroke();
+  c.beginPath(); c.arc(k.bx-3,k.by-3,2.6,0,Math.PI*2);
+  c.fillStyle="#ffffff"; c.fill();
 }
 function roundClear(){
   if(!S||S.phase!=="play"||S.score<S.target) return;
@@ -1726,26 +1776,43 @@ window.addEventListener("keydown",e=>{
   if(k){ const n=k==="normal"?S.stock:S.inv[k]; if(n>0){ S.sel=k; refreshUI(); } }
   if(e.key===" "){ e.preventDefault(); tryDrop(S.aimX); }
 });
-document.getElementById("startStageBtn").onclick=()=>{
-  ensureAC();
-  document.getElementById("titleOv").style.display="none";
-  newGame("stage");
-  buildZoneStrips();
-};
-for(const [id,diff] of [["startEndlessEasyBtn","easy"],["startEndlessNormalBtn","normal"],["startEndlessHardBtn","hard"]]){
-  document.getElementById(id).onclick=()=>{
-    ensureAC();
-    document.getElementById("titleOv").style.display="none";
-    newGame("endless",diff);
-    buildZoneStrips();
-  };
+// タイトル画面：難易度ボタンにセーブ済みのコイン枚数を表示する
+function refreshTitleSaves(){
+  for(const [diff,id] of [["easy","saveInfoEasy"],["normal","saveInfoNormal"],["hard","saveInfoHard"]]){
+    const save=loadEndlessSave(diff);
+    document.getElementById(id).textContent = save ? `🪙${(save.stock||0).toLocaleString()}` : "はじめから";
+  }
 }
-document.getElementById("startTrialBtn").onclick=()=>{
+function startGame(mode,diff){
   ensureAC();
   document.getElementById("titleOv").style.display="none";
-  newGame("trial");
+  document.getElementById("homeBtn").style.display="";
+  newGame(mode,diff);
   buildZoneStrips();
+}
+document.getElementById("startStageBtn").onclick=()=>startGame("stage");
+for(const [id,diff] of [["startEndlessEasyBtn","easy"],["startEndlessNormalBtn","normal"],["startEndlessHardBtn","hard"]]){
+  document.getElementById(id).onclick=()=>startGame("endless",diff);
+}
+document.getElementById("startTrialBtn").onclick=()=>startGame("trial");
+// プレー画面からホーム（モード選択）へ戻る。エンドレスは進捗を保存してから戻る
+document.getElementById("homeBtn").onclick=()=>{
+  if(!S) return;
+  saveEndlessProgress();
+  // 進行中の演出・オーバーレイを全部閉じ、台の上を空にしてからタイトルへ
+  S.kurun=null; S.slotAnim=null; S.ballRoulette=null; S.busy=false;
+  S.eventQueue=[]; S.rainQueue=[];
+  S.towerVisual=null;
+  render3D();               // タワーの後片付け（破片→コイン変換）を先に走らせる
+  S.coins=[]; S.parts=[]; S.floats=[];
+  render3D();               // 空になった台を反映
+  S=null;
+  for(const id of ["jpOv","ballRouletteOv","shopOv","overOv"]) document.getElementById(id).style.display="none";
+  document.getElementById("homeBtn").style.display="none";
+  refreshTitleSaves();
+  document.getElementById("titleOv").style.display="flex";
 };
+refreshTitleSaves();
 document.getElementById("nextBtn").onclick=nextRound;
 document.getElementById("retryBtn").onclick=()=>{
   document.getElementById("overOv").style.display="none";
