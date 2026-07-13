@@ -324,7 +324,8 @@ function writeEndlessSave(save,difficulty){
   try{ localStorage.setItem(endlessSaveKey(difficulty), JSON.stringify(save)); }catch(e){}
 }
 function saveEndlessProgress(){
-  if(!S||S.mode!=="endless") return;
+  // ゲームオーバー後は保存しない（オーバー時にセーブは消去済み。死んだ状態を再保存しないため）
+  if(!S||S.mode!=="endless"||S.phase==="over") return;
   writeEndlessSave({ stock:S.stock, totalCoinsWon:S.totalCoinsWon, balls:S.balls, inv:S.inv, lastPlayDateStr:todayStr() }, S.difficulty);
 }
 // 既存セーブがある場合のみ、日付が変わっていればコインをランダムでプレゼントする
@@ -1087,12 +1088,17 @@ function nextRound(){
 }
 function gameOver(){
   S.phase="over"; SND.over();
+  // エンドレスはセーブを消して最初から（リトライ・次回起動とも初期状態で開始）
+  if(S.mode==="endless"){
+    try{ localStorage.removeItem(endlessSaveKey(S.difficulty)); }catch(e){}
+  }
   document.getElementById("overText").innerHTML = S.mode==="stage"
     ? `到達ラウンド：<b style="color:#c0392b;font-size:20px">${S.round}</b><br>`+
       `このラウンドのスコア：${S.score} / ${S.target}<br>`+
       `累計スコア：<b style="color:#27ae60">${S.totalScore}</b>`
     : `🪙 累計獲得コイン：<b style="color:#3498db;font-size:22px">${S.totalCoinsWon.toLocaleString()}</b><br>`+
-      `最終手持ちコイン：<b style="color:#1d8fb0">${S.stock}</b>`;
+      `最終手持ちコイン：<b style="color:#1d8fb0">${S.stock}</b><br>`+
+      `<span style="font-size:12px;color:#a06a40">セーブデータをリセットしました。次は最初からスタート！</span>`;
   document.getElementById("overOv").style.display="flex";
   updateMiniShop();
 }
