@@ -22,6 +22,8 @@
   #warnBox { position:absolute; top:42%; left:50%; transform:translateX(-50%); font-size:22px; font-weight:900; color:#ff5a5a; text-shadow:0 2px 6px rgba(0,0,0,.8); pointer-events:none; display:none; }
   #towerBox { position:absolute; top:1.5%; left:50%; transform:translateX(-50%); text-align:center; font-weight:900; color:#ffd94d; text-shadow:0 2px 6px rgba(0,0,0,.85); pointer-events:none; display:none; }
   #towerBox .t1 { font-size:19px; }
+  #dunBox { position:absolute; top:1.5%; left:50%; transform:translateX(-50%); text-align:center; font-weight:900; color:#e0c8ff; text-shadow:0 2px 6px rgba(0,0,0,.9); pointer-events:none; }
+  #dunBox .t1 { font-size:18px; }
   #towerBox .t2 { font-size:13px; color:#ffe9a8; }
   #side { width:260px; align-self:center; display:flex; flex-direction:column; gap:10px; }
   .panel { background:#fff3dd; border:3px solid #b3592b; border-radius:14px; padding:12px; box-shadow:0 4px 14px rgba(0,0,0,.4); }
@@ -54,6 +56,11 @@
   .bigbtn { margin-top:16px; padding:14px 36px; min-height:48px; font-size:17px; font-weight:bold; color:#fff; background:linear-gradient(180deg,#e74c3c,#c0392b); border:3px solid #8e2a1c; border-radius:32px; cursor:pointer; box-shadow:0 5px 16px rgba(192,57,43,.5); touch-action:manipulation; }
   .bigbtn.alt { background:linear-gradient(180deg,#3498db,#2166a3); border-color:#194a75; box-shadow:0 5px 16px rgba(33,102,163,.5); }
   .bigbtn.trial { background:linear-gradient(180deg,#2ecc71,#1e8f4e); border-color:#155c33; box-shadow:0 5px 16px rgba(30,143,78,.5); font-size:15px; padding:11px 30px; min-height:44px; }
+  .bigbtn.dungeon { background:linear-gradient(180deg,#9b59b6,#6c3483); border-color:#4a2159; box-shadow:0 5px 16px rgba(108,52,131,.5); font-size:15px; padding:11px 30px; min-height:44px; }
+  .hpbar { height:12px; background:#e6d3b8; border:2px solid #8a5a3a; border-radius:7px; overflow:hidden; margin:3px 0 6px; }
+  .hpbar > i { display:block; height:100%; transition:width .18s; }
+  .orbLegend { display:flex; align-items:center; gap:6px; font-size:11.5px; color:#7a4a28; margin:3px 0; }
+  .orbLegend .dot { width:13px; height:13px; border-radius:50%; flex:none; box-shadow:0 0 5px rgba(0,0,0,.35) inset; }
   @media (hover:hover) and (pointer:fine){ .bigbtn:hover { filter:brightness(1.1); } }
   .shopGrid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:14px 0 4px; }
   .shopItem { background:#ffe9c7; border:2px solid #d8a468; border-radius:12px; padding:10px; text-align:left; }
@@ -127,6 +134,7 @@
     <div id="comboBox"><div class="c1"></div><div class="c2"></div></div>
     <div id="warnBox"></div>
     <div id="towerBox"><div class="t1">🏆 メダルタワー出現！</div><div class="t2">コインをぶつけて自力で崩そう！</div></div>
+    <div id="dunBox" style="display:none"><div class="t1" id="dunBoxText">洞窟</div></div>
     <button id="muteBtn" title="サウンド切替">🔊</button>
     <button id="adminBtn" title="管理者メニュー">🔧</button>
     <button id="homeBtn" title="ホームへ戻る" style="display:none">🏠</button>
@@ -146,6 +154,8 @@
           <button class="bigbtn alt" id="startEndlessHardBtn" style="flex:1;padding:10px 4px;font-size:13px;margin-top:0">難しい<span class="saveInfo" id="saveInfoHard"></span></button>
         </div>
         <div style="font-size:11px;color:#a06a40;margin-top:4px">手前に落ちたコインがそのまま獲得に。難易度が上がるほどスコアゾーンが狭くなります。中央ゾーンで奥のモニターが液晶抽選、玉が3つ落ちたらバンパー抽選のJPチャレンジ！難易度ごとに進捗を自動保存、日をまたぐとログインボーナスも！</div>
+        <button class="bigbtn dungeon" id="startDungeonBtn">⛩️ 妖怪退治モード<span class="saveInfo" id="saveInfoDungeon"></span></button>
+        <div style="font-size:11px;color:#a06a40;margin-top:4px">古銭を押し出して台に出てきた<b style="color:#a06ad0">珠</b>をスコアゾーンに落とすと、攻撃・防御・回復が発動！妖怪を倒しながら洞窟の奥へ。体力が尽きても到達済みチェックポイントから再開できます</div>
         <button class="bigbtn trial" id="startTrialBtn">🧪 試しモード</button>
         <div style="font-size:11px;color:#a06a40;margin-top:4px">ボールや特殊コインをその場で自由に獲得できる練習用モード。コインも尽きません</div>
       </div>
@@ -192,6 +202,13 @@
       <div class="stat"><span class="sub">残りコイン</span><b id="uiStock">30</b></div>
       <div class="stat" id="rowBalls" style="display:none"><span class="sub">🔵 JPボール</span><b id="uiBalls" style="color:#3498db;letter-spacing:3px">○○○</b></div>
       <div class="stat" id="rowQueue" style="display:none"><span class="sub">🎰 液晶保留</span><b id="uiQueue" style="color:#e67e22;letter-spacing:3px">○○○</b></div>
+      <div id="rowFloor" style="display:none">
+        <div class="stat" style="margin-top:8px"><span class="sub">⛩️ 洞窟</span><b id="uiFloor" style="color:#9b59b6">1階</b></div>
+        <div class="stat"><span class="sub">体力</span><b id="uiHp" style="font-size:15px;color:#1e8f4e">100 / 100</b></div>
+        <div class="hpbar"><i id="uiHpBar" style="width:100%;background:linear-gradient(180deg,#7dffb0,#1e8f4e)"></i></div>
+        <div class="stat"><span class="sub" id="uiEnemyName">妖怪</span><b id="uiEnemyHp" style="font-size:15px">0 / 0</b></div>
+        <div class="hpbar"><i id="uiEnemyBar" style="width:100%;background:linear-gradient(180deg,#ff8a8a,#c0392b)"></i></div>
+      </div>
     </div>
     <div class="panel">
       <div style="font-size:12px;color:#8a5a3a;margin-bottom:8px">投入コイン選択</div>
@@ -205,9 +222,14 @@
       <div style="font-size:12px;color:#1e8f4e;margin-bottom:8px">🧪 試しモード：自由に獲得</div>
       <div id="trialBtns"></div>
     </div>
+    <div class="panel" id="panelDungeon" style="display:none">
+      <div style="font-size:12px;color:#6c3483;margin-bottom:6px">🔮 珠の効果（スコアゾーンに落とす）</div>
+      <div id="orbLegend"></div>
+    </div>
     <div class="panel hint">
       💡 <b>スコアゾーン</b>（緑）に落とすと得点。端の赤いゾーンはロスト。<br>
       中央ゾーンは<b style="color:#e67e22">ステージモードで×3ボーナス</b>／<b style="color:#3498db">エンドレスモードで奥のモニターが液晶抽選</b>！<br>
+      ⛩️ <b style="color:#9b59b6">妖怪退治モード</b>は台に出てくる<b>珠</b>をスコアゾーンへ落として攻撃・防御・回復。古銭自体も当てれば小ダメージ。<br>
       💣 ボムは着地後に爆発して周囲を吹き飛ばす。🐰 ウサギは自分で跳ねて前進、🧲 マグネットは周囲を引き寄せる。
     </div>
   </div>
@@ -242,6 +264,37 @@ const TYPES={
   jpball:{name:"JPボール", r:13, mass:1,  value:0,  ticket:0, col:"#eaf6ff", col2:"#3498db", key:"", desc:"液晶抽選で出現。スコアゾーンに落とすと1個獲得"},
 };
 const ORDER=["normal","gold","bomb","rabbit","magnet","big","split"];
+
+/* ===== 妖怪退治モード（古銭プッシャー風）：珠と妖怪の定義 ===== */
+// 台に排出される「珠」。スコアゾーン(＝シューターの箱)に落とすと効果が発動する
+const ORBS={
+  orbAtk:  {name:"攻撃珠", emoji:"⚔️", col:"#ff6b6b", col2:"#a02020", desc:"妖怪に大ダメージ"},
+  orbMulti:{name:"連撃珠", emoji:"🌀", col:"#ffb066", col2:"#b35c1a", desc:"3連続でダメージ"},
+  orbDef:  {name:"守り珠", emoji:"🛡️", col:"#8fd0ff", col2:"#2166a3", desc:"シールドを獲得"},
+  orbHeal: {name:"癒し珠", emoji:"💚", col:"#7dffb0", col2:"#1e8f4e", desc:"体力を回復"},
+  orbCoin: {name:"古銭珠", emoji:"🪙", col:"#ffe07a", col2:"#c99a1e", desc:"古銭を大量獲得"},
+};
+const ORB_KEYS=Object.keys(ORBS);
+for(const k of ORB_KEYS){
+  const o=ORBS[k];
+  TYPES[k]={name:o.name, r:12, mass:1.1, value:0, ticket:0, col:o.col, col2:o.col2, key:"", desc:o.desc, orb:true};
+}
+// 珠の排出抽選テーブル（重みつき）
+const ORB_WEIGHTS=[["orbAtk",32],["orbMulti",20],["orbDef",18],["orbHeal",18],["orbCoin",12]];
+function rollOrbType(){
+  const total=ORB_WEIGHTS.reduce((a,w)=>a+w[1],0);
+  let r=Math.random()*total;
+  for(const [k,w] of ORB_WEIGHTS){ r-=w; if(r<=0) return k; }
+  return "orbAtk";
+}
+const YOKAI=[
+  {n:"一つ目小僧", e:"👁️"}, {n:"化け狸", e:"🦝"}, {n:"唐傘お化け", e:"🌂"},
+  {n:"雪女", e:"❄️"}, {n:"鎌鼬", e:"🌪️"}, {n:"River童", e:"🥒"},
+  {n:"提灯お化け", e:"🏮"}, {n:"ぬらりひょん", e:"👴"},
+];
+const YOKAI_BOSS=[{n:"大天狗", e:"👺"},{n:"九尾の狐", e:"🦊"},{n:"鬼神", e:"👹"},{n:"八岐大蛇", e:"🐍"}];
+const DUN_CHECKPOINT_EVERY=3;   // この階数ごとにチェックポイント
+const DUN_BOSS_EVERY=5;         // この階数ごとにボス
 
 /* ================= サウンド ================= */
 let ac=null, muted=false;
@@ -287,15 +340,19 @@ function pusherFront(t){
 function droppable(){ return S.stock+ORDER.slice(1).reduce((a,k)=>a+S.inv[k],0); }
 function applyModeUI(){
   const stage=S.mode==="stage";
+  const dun=S.mode==="dungeon";
   document.getElementById("rowRound").style.display=stage?"":"none";
   document.getElementById("rowScoreTarget").style.display=stage?"":"none";
   document.getElementById("progWrap").style.display=stage?"":"none";
   document.getElementById("rowScoreEndless").style.display=stage?"none":"";
   document.getElementById("rowTicket").style.display=stage?"":"none";
   document.getElementById("panelMiniShop").style.display=stage?"":"none";
-  document.getElementById("rowBalls").style.display=stage?"none":"";
-  document.getElementById("rowQueue").style.display=stage?"none":"";
+  // 妖怪退治モードは液晶抽選・JPボールを使わない
+  document.getElementById("rowBalls").style.display=(stage||dun)?"none":"";
+  document.getElementById("rowQueue").style.display=(stage||dun)?"none":"";
   document.getElementById("panelTrial").style.display=S.mode==="trial"?"":"none";
+  document.getElementById("panelDungeon").style.display=dun?"":"none";
+  document.getElementById("rowFloor").style.display=dun?"":"none";
 }
 // ================= エンドレスモードの永続化（難易度ごとに別セーブ）・日替わりログインボーナス =================
 const ENDLESS_SAVE_KEY="medalPusherEndlessSave_v1";   // 旧: 難易度共通のセーブ（移行元として参照）
@@ -328,6 +385,19 @@ function saveEndlessProgress(){
   if(!S||S.mode!=="endless"||S.phase==="over") return;
   writeEndlessSave({ stock:S.stock, totalCoinsWon:S.totalCoinsWon, balls:S.balls, inv:S.inv, lastPlayDateStr:todayStr() }, S.difficulty);
 }
+// ===== 妖怪退治モードの永続化（到達階・チェックポイントを保存） =====
+const DUNGEON_SAVE_KEY="medalPusherDungeonSave_v1";
+function loadDungeonSave(){
+  try{ const raw=localStorage.getItem(DUNGEON_SAVE_KEY); return raw?JSON.parse(raw):null; }catch(e){ return null; }
+}
+function writeDungeonSave(save){
+  try{ localStorage.setItem(DUNGEON_SAVE_KEY, JSON.stringify(save)); }catch(e){}
+}
+function saveDungeonProgress(){
+  if(!S||S.mode!=="dungeon"||!S.dun) return;
+  writeDungeonSave({ floor:S.dun.floor, checkpoint:S.dun.checkpoint, deepest:S.dun.deepest,
+    stock:S.stock, totalCoinsWon:S.totalCoinsWon, inv:S.inv, lastPlayDateStr:todayStr() });
+}
 // 既存セーブがある場合のみ、日付が変わっていればコインをランダムでプレゼントする
 function checkDailyBonus(save){
   const today=todayStr();
@@ -337,7 +407,11 @@ function checkDailyBonus(save){
   save.lastPlayDateStr=today;
   return bonus;
 }
-window.addEventListener("beforeunload",()=>{ if(S&&S.mode==="endless") saveEndlessProgress(); });
+window.addEventListener("beforeunload",()=>{
+  if(!S) return;
+  if(S.mode==="endless") saveEndlessProgress();
+  if(S.mode==="dungeon") saveDungeonProgress();
+});
 
 function newGame(mode,difficulty){
   S={
@@ -353,7 +427,7 @@ function newGame(mode,difficulty){
     balls:0, busy:false, towerVisual:null,
     eventQueue:[], rainQueue:[], rainTimer:0,
     totalCoinsWon:0, slotAnim:null, kurun:null, ballRoulette:null,
-    pendingDailyBonus:0,
+    pendingDailyBonus:0, dun:null,
   };
   applyModeUI();
   if(S.mode==="endless"){
@@ -372,6 +446,22 @@ function newGame(mode,difficulty){
     // 試しモード：保存はせず、毎回たっぷりのコイン・アイテムで始める（コインも尽きない）
     S.stock=300;
     S.inv={gold:10,bomb:10,rabbit:10,magnet:10,big:10,split:10};
+  }else if(S.mode==="dungeon"){
+    // 妖怪退治モード：到達済みチェックポイントから再開
+    const save=loadDungeonSave();
+    S.stock=60;
+    if(save){
+      S.stock=Math.max(40,save.stock||60);
+      S.totalCoinsWon=save.totalCoinsWon||0;
+      Object.assign(S.inv, save.inv||{});
+    }
+    const cp=save?(save.checkpoint||1):1;
+    S.dun={
+      floor:cp, checkpoint:cp, deepest:save?(save.deepest||cp):1,
+      hp:100, maxHp:100, shield:0, enemy:null,
+      orbT:2.5, clearT:0, defeatT:0, hurtT:0, banner:"", bannerT:0,
+    };
+    startFloor(S.dun.floor);
   }
   // 台を飽和密度で敷き詰める（隙間があると押し出しが発生しない）
   for(let row=0;row<12;row++){
@@ -444,11 +534,25 @@ function coinFalls(c){
     return;
   }
 
+  // 珠（妖怪退治モード）：シューター＝スコアゾーンに入れば効果発動、外れたら失われる
+  if(c.d.orb){
+    if(inScore){
+      c.fallZone="score";
+      activateOrb(c);
+    }else{
+      addFloat(c.x,"珠ロスト…","#c9a98a");
+      SND.lost();
+      c.fallZone="lost";
+    }
+    refreshUI(); sbDirty=true;
+    return;
+  }
+
   if(inScore){
     S.combo++; S.comboT=2.0+S.up.combo*0.6;
     let mult=1+(S.combo-1)*0.25;
     const jp=(c.x>=z.jL&&c.x<=z.jR);
-    const queueThis=jp&&S.mode!=="stage";   // エンドレス・試しモードは液晶抽選、ステージは従来通り即×3
+    const queueThis=jp&&(S.mode==="endless"||S.mode==="trial");   // 液晶抽選はエンドレス・試しモードのみ
     if(jp&&!queueThis) mult*=3;
     const pts=Math.round(c.d.value*mult);
     c.fallZone="score";
@@ -466,6 +570,7 @@ function coinFalls(c){
       S.stock+=coinsBack;
       S.totalCoinsWon+=coinsBack;
       addFloat(c.x,"🪙+"+coinsBack,jp?"#ffd94d":"#7dffb0",jp);
+      if(S.mode==="dungeon") dungeonCoinHit(c,jp);
     }
     burst3D(c.x,FRONT,jp?0xffd94d:0x7dffb0,jp?26:12);
     jp?SND.jp():SND.score(S.combo);
@@ -509,6 +614,8 @@ function update(dt){
 
   // JP当選：台の上にコイン200枚ぶんのタワーが積み上がる（塔そのものが報酬。別枠の払い出しは無し）
   if(S.towerVisual) updateTowerVisual(dt);
+  // 妖怪退治モード：珠の排出・妖怪の攻撃・階層進行（ウォームアップ中は戦闘を進めない）
+  if(S.mode==="dungeon"&&S.dun&&!S.warmup) updateDungeon(dt);
   // 液晶抽選・ルーレットの特典演出：いつもの投入エリア付近に指定された種類のコインを1枚ずつ降らせる
   if(S.rainQueue.length>0){
     S.rainTimer-=dt;
@@ -823,6 +930,163 @@ function spawnTypedRain(type,n){
 }
 function spawnCoinRain(n){ spawnTypedRain("normal",n); }
 
+/* ================= 妖怪退治モード（古銭プッシャー風のバトル） =================
+   古銭を押し出して台に排出された「珠」をシューター（スコアゾーン）へ落とし、
+   攻撃・防御・回復を発動して妖怪を倒しながら洞窟の奥へ進む。
+   体力が尽きても到達済みのチェックポイントから再開できる。 */
+function isBossFloor(f){ return f%DUN_BOSS_EVERY===0; }
+function startFloor(f){
+  const d=S.dun;
+  d.floor=f;
+  d.deepest=Math.max(d.deepest||1, f);
+  const boss=isBossFloor(f);
+  const src=boss?YOKAI_BOSS:YOKAI;
+  const pick=src[(boss?Math.floor(f/DUN_BOSS_EVERY)-1:f-1+Math.floor(Math.random()*3))%src.length];
+  const hp=Math.round((60+f*28)*(boss?2.2:1));
+  d.enemy={
+    name:pick.n, emoji:pick.e, boss,
+    hp, maxHp:hp,
+    dmg:Math.round((6+f*1.6)*(boss?1.5:1)),
+    interval:Math.max(3.0, 6.5-f*0.15),
+    atkT:Math.max(3.0, 6.5-f*0.15),
+    windup:0,
+  };
+  d.banner=`${boss?"⚠️ ボス ":""}${f}階：${pick.e} ${pick.n} 出現！`;
+  d.bannerT=2.6;
+  sbDirty=true;
+}
+function dunBanner(txt,dur){ if(S&&S.dun){ S.dun.banner=txt; S.dun.bannerT=dur||2.0; } }
+// 台の奥（プッシャーの上）に珠を1個排出する。押し出されて手前へ流れてくる
+function spawnOrb(type){
+  const t=type||rollOrbType();
+  const c=mkCoin(t, WALL_L+40+Math.random()*(WALL_R-WALL_L-80), BACK+22+Math.random()*34, 1);
+  S.coins.push(c);
+  return c;
+}
+function orbsOnField(){ return S.coins.filter(c=>c.d.orb&&c.state!=="dead").length; }
+// 妖怪にダメージを与える
+function damageEnemy(n,label,col){
+  const d=S.dun; if(!d||!d.enemy) return;
+  d.enemy.hp=Math.max(0,d.enemy.hp-n);
+  addFloat(CX+(Math.random()-0.5)*80, `${label||""}-${n}`, col||"#ff8a5c", true, 40);
+  S.shake=Math.max(S.shake,5);
+  sbDirty=true;
+  if(d.enemy.hp<=0) floorClear();
+}
+// プレイヤーが妖怪の攻撃を受ける（シールドで軽減）
+function damagePlayer(n){
+  const d=S.dun; if(!d) return;
+  let dmg=n;
+  if(d.shield>0){
+    const absorbed=Math.min(d.shield,dmg);
+    d.shield-=absorbed; dmg-=absorbed;
+    addFloat(CX-60,`🛡️-${absorbed}`,"#8fd0ff",false,50);
+  }
+  if(dmg>0){
+    d.hp=Math.max(0,d.hp-dmg);
+    addFloat(CX+60,`💔-${dmg}`,"#ff5c5c",true,50);
+    S.shake=Math.max(S.shake,10);
+    d.hurtT=0.45;
+    SND.lost();
+  }
+  sbDirty=true;
+  if(d.hp<=0) dungeonDefeat();
+}
+// 珠がシューター（スコアゾーン）に入った：効果発動
+function activateOrb(c){
+  const d=S.dun; if(!d) return;
+  const f=d.floor, o=ORBS[c.type];
+  burst3D(c.x,FRONT,parseInt(o.col.slice(1),16),22);
+  SND.jp();
+  if(c.type==="orbAtk"){
+    damageEnemy(22+f*4, "⚔️", "#ff6b6b");
+  }else if(c.type==="orbMulti"){
+    const per=9+Math.round(f*1.6);
+    damageEnemy(per,"🌀","#ffb066");
+    // 残り2撃は少し遅らせて連撃らしく見せる
+    for(let i=1;i<3;i++) setTimeout(()=>{ if(S&&S.dun&&S.dun.enemy&&S.phase==="play") damageEnemy(per,"🌀","#ffb066"); }, i*220);
+  }else if(c.type==="orbDef"){
+    const g=18+f*3;
+    d.shield=Math.min(80,d.shield+g);
+    addFloat(c.x,`🛡️+${g}`,"#8fd0ff",true,40);
+  }else if(c.type==="orbHeal"){
+    const g=22+f*2;
+    d.hp=Math.min(d.maxHp,d.hp+g);
+    addFloat(c.x,`💚+${g}`,"#7dffb0",true,40);
+  }else if(c.type==="orbCoin"){
+    const g=25+f*5;
+    S.stock+=g; S.totalCoinsWon+=g;
+    addFloat(c.x,`🪙+${g}`,"#ffe07a",true,40);
+  }
+  sbDirty=true;
+}
+// 古銭そのものがシューターに入ったときの小ダメージ
+function dungeonCoinHit(c,jp){
+  const d=S.dun; if(!d||!d.enemy) return;
+  damageEnemy(jp?6:2, "", "#ffd94d");
+}
+function floorClear(){
+  const d=S.dun; if(!d) return;
+  const boss=d.enemy&&d.enemy.boss;
+  const reward=40+d.floor*8+(boss?120:0);
+  S.stock+=reward; S.totalCoinsWon+=reward;
+  d.hp=Math.min(d.maxHp, d.hp+Math.round(d.maxHp*0.15));
+  d.enemy=null;
+  d.clearT=2.2;
+  SND.clear();
+  burst3D(CX,FRONT-80,0xffd94d,40);
+  const next=d.floor+1;
+  const cpReached=(next-1)%DUN_CHECKPOINT_EVERY===0;
+  if(cpReached){ d.checkpoint=next; }
+  d.deepest=Math.max(d.deepest||1, next);
+  dunBanner(`🎉 撃破！古銭+${reward}${cpReached?"／⛩️ チェックポイント到達":""}`, 2.2);
+  saveDungeonProgress();
+}
+function dungeonDefeat(){
+  const d=S.dun; if(!d) return;
+  // 到達済みチェックポイントから再開（古銭は半分に）
+  d.floor=d.checkpoint;
+  d.hp=d.maxHp; d.shield=0;
+  d.enemy=null; d.clearT=0; d.defeatT=2.4;
+  S.stock=Math.max(40, Math.floor(S.stock/2));
+  S.coins=S.coins.filter(c=>!c.d.orb);
+  SND.over();
+  dunBanner(`💀 やられた… ${d.checkpoint}階から再開（古銭半減）`, 2.4);
+  saveDungeonProgress();
+}
+function updateDungeon(dt){
+  const d=S.dun; if(!d) return;
+  if(d.bannerT>0) d.bannerT-=dt;
+  if(d.hurtT>0) d.hurtT-=dt;
+  // 撃破・敗北の間（次の階へ進むまで）は敵の行動を止める
+  if(d.clearT>0){
+    d.clearT-=dt;
+    if(d.clearT<=0) startFloor(d.floor+1);
+    return;
+  }
+  if(d.defeatT>0){
+    d.defeatT-=dt;
+    if(d.defeatT<=0) startFloor(d.floor);
+    return;
+  }
+  if(!d.enemy) return;
+  // 珠の排出
+  d.orbT-=dt;
+  if(d.orbT<=0){
+    d.orbT=4.0+Math.random()*2.5;
+    if(orbsOnField()<7) spawnOrb();
+  }
+  // 妖怪の攻撃
+  const e=d.enemy;
+  e.atkT-=dt;
+  e.windup=e.atkT<0.9?1-e.atkT/0.9:0;   // 攻撃直前の予兆（モニター表示用）
+  if(e.atkT<=0){
+    e.atkT=e.interval;
+    damagePlayer(e.dmg);
+  }
+  sbDirty=true;
+}
+
 // ボーナスルーレット：JPボールが1つ落ちるたびに開催。特典に他のコイン種類も含む
 const BALL_ROULETTE_REWARDS=[
   {label:"コイン+10",   col:"#ffd94d", fn:()=>spawnCoinRain(10)},
@@ -1087,6 +1351,12 @@ function nextRound(){
   refreshUI(); sbDirty=true;
 }
 function gameOver(){
+  // 妖怪退治モードは古銭が尽きてもゲームオーバーにせず、チェックポイントから再開する
+  if(S.mode==="dungeon"&&S.dun){
+    S.outT=-1;
+    dungeonDefeat();
+    return;
+  }
   S.phase="over"; SND.over();
   // エンドレスはセーブを消して最初から（リトライ・次回起動とも初期状態で開始）
   if(S.mode==="endless"){
@@ -1243,6 +1513,14 @@ for(const k of ORDER){
 // JPボール（液晶抽選で台に出現する物理オブジェクト）専用の球体メッシュ
 coinGeos.jpball=new THREE.SphereGeometry(TYPES.jpball.r*K, COIN_SEGS, Math.max(6,COIN_SEGS/2));
 coinMats.jpball=new THREE.MeshStandardMaterial({color:0xeaf6ff, emissive:0x3498db, emissiveIntensity:0.5, roughness:0.25, metalness:0.15});
+// 珠（妖怪退治モード）：効果ごとに色分けした光る球体
+for(const k of ORB_KEYS){
+  const d=TYPES[k];
+  coinGeos[k]=new THREE.SphereGeometry(d.r*K, COIN_SEGS, Math.max(6,COIN_SEGS/2));
+  coinMats[k]=new THREE.MeshStandardMaterial({
+    color:new THREE.Color(d.col), emissive:new THREE.Color(d.col2),
+    emissiveIntensity:0.85, roughness:0.2, metalness:0.3});
+}
 
 /* --- 筐体の構築 --- */
 const world=new THREE.Group(); scene.add(world);
@@ -1287,6 +1565,7 @@ function drawScoreboard(){
   sbTex.needsUpdate=true;
 }
 function drawNormalBoard(c){
+  if(S&&S.mode==="dungeon"&&S.dun){ drawDungeonBoard(c); return; }
   const g=c.createLinearGradient(0,0,0,280);
   g.addColorStop(0,"#1a2a4a"); g.addColorStop(1,"#0e1830");
   c.fillStyle=g; c.fillRect(0,0,640,280);
@@ -1319,6 +1598,53 @@ function drawNormalBoard(c){
     c.fillStyle="#ffb0c8";
     c.fillText(S&&S.combo>=2?`Combo x${S.combo}`:"", 600, 240);
   }
+}
+// 妖怪退治モードの奥モニター：妖怪の姿と互いの体力、攻撃の予兆を表示する
+function drawDungeonBoard(c){
+  const d=S.dun, e=d.enemy;
+  const g=c.createLinearGradient(0,0,0,280);
+  if(d.hurtT>0){ g.addColorStop(0,"#5a1414"); g.addColorStop(1,"#2a0808"); }
+  else{ g.addColorStop(0,"#221a34"); g.addColorStop(1,"#0d0a18"); }
+  c.fillStyle=g; c.fillRect(0,0,640,280);
+  c.strokeStyle="#c08fff"; c.lineWidth=8; c.strokeRect(6,6,628,268);
+  c.textAlign="center";
+  // 階層表示
+  c.fillStyle="#d9c8ff"; c.font="bold 24px sans-serif";
+  c.fillText(`⛩️ 洞窟 ${d.floor}階${e&&e.boss?"（ボス）":""}`, 320, 40);
+  if(e){
+    // 妖怪
+    const shake=e.windup>0.6?Math.sin(S.t*40)*4:0;
+    c.font="64px sans-serif";
+    c.fillText(e.emoji, 320+shake, 108);
+    c.fillStyle="#ffe9a8"; c.font="bold 22px sans-serif";
+    c.fillText(e.name, 320, 136);
+    // 敵HPバー
+    const bw=460, bx=(640-bw)/2;
+    c.fillStyle="#2a2038"; c.fillRect(bx,150,bw,20);
+    c.fillStyle="#ff5c5c"; c.fillRect(bx,150,bw*(e.hp/e.maxHp),20);
+    c.strokeStyle="#6b5a8a"; c.lineWidth=2; c.strokeRect(bx,150,bw,20);
+    c.fillStyle="#fff"; c.font="bold 14px sans-serif";
+    c.fillText(`${e.hp} / ${e.maxHp}`, 320, 165);
+    // 攻撃までのゲージ
+    c.fillStyle=e.windup>0?"#ff8a5c":"#9a8ab0"; c.font="bold 13px sans-serif";
+    c.fillText(e.windup>0?"⚡ 攻撃してくる！":`次の攻撃まで ${e.atkT.toFixed(1)}秒`, 320, 190);
+  }else{
+    c.fillStyle="#ffd94d"; c.font="bold 30px sans-serif";
+    c.fillText(d.defeatT>0?"💀 やられた…":"🎉 妖怪を撃破！", 320, 130);
+  }
+  // プレイヤーHP＋シールド
+  const pw=460, px=(640-pw)/2;
+  c.fillStyle="#2a2038"; c.fillRect(px,214,pw,22);
+  c.fillStyle="#7dffb0"; c.fillRect(px,214,pw*(d.hp/d.maxHp),22);
+  if(d.shield>0){
+    c.fillStyle="rgba(143,208,255,.75)";
+    c.fillRect(px,214,pw*Math.min(1,d.shield/d.maxHp),22);
+  }
+  c.strokeStyle="#6b5a8a"; c.lineWidth=2; c.strokeRect(px,214,pw,22);
+  c.fillStyle="#0d0a18"; c.font="bold 14px sans-serif";
+  c.fillText(`体力 ${d.hp} / ${d.maxHp}${d.shield>0?`  🛡️${d.shield}`:""}`, 320, 230);
+  c.fillStyle="#9a8ab0"; c.font="bold 12px sans-serif";
+  c.fillText(`⛩️ チェックポイント ${d.checkpoint}階 ／ 最深 ${d.deepest}階`, 320, 258);
 }
 function drawSlotOnBoard(c,sa){
   const g=c.createLinearGradient(0,0,0,280);
@@ -1449,8 +1775,8 @@ function buildZoneStrips(){
 /* --- コインメッシュ管理 --- */
 const coinMeshes=new Map();
 function coinY(c){
-  if(c.type==="jpball"){
-    const r=TYPES.jpball.r*K;
+  if(c.type==="jpball"||c.d.orb){
+    const r=c.d.r*K;
     return c.tier===1 ? PUSH_TOP+r : r;
   }
   if(c.tier===1) return PUSH_TOP+COIN_H/2;
@@ -1735,6 +2061,15 @@ function refreshUI(){
     document.getElementById("uiBalls").textContent="●".repeat(S.balls)+"○".repeat(3-S.balls);
     { const sq=S.eventQueue.filter(e=>e==="slot").length; document.getElementById("uiQueue").textContent="●".repeat(sq)+"○".repeat(3-sq); }
   }
+  if(S.mode==="dungeon"&&S.dun){
+    const d=S.dun, e=d.enemy;
+    document.getElementById("uiFloor").textContent=`${d.floor}階${e&&e.boss?" ★":""}`;
+    document.getElementById("uiHp").textContent=`${d.hp} / ${d.maxHp}${d.shield>0?`  🛡️${d.shield}`:""}`;
+    document.getElementById("uiHpBar").style.width=(d.hp/d.maxHp*100)+"%";
+    document.getElementById("uiEnemyName").textContent=e?`${e.emoji} ${e.name}`:"—";
+    document.getElementById("uiEnemyHp").textContent=e?`${e.hp} / ${e.maxHp}`:"—";
+    document.getElementById("uiEnemyBar").style.width=e?(e.hp/e.maxHp*100)+"%":"0%";
+  }
   for(const k of ORDER){
     const b=btnEls[k];
     const n=k==="normal"?S.stock:S.inv[k];
@@ -1744,6 +2079,7 @@ function refreshUI(){
   }
   updateMiniShop();
   if(S.mode==="endless") saveEndlessProgress();
+  if(S.mode==="dungeon") saveDungeonProgress();
 }
 const btnEls={};
 function buildCoinBtns(){
@@ -1765,6 +2101,20 @@ buildCoinBtns();
 const comboBox=document.getElementById("comboBox");
 const warnBox=document.getElementById("warnBox");
 const towerBox=document.getElementById("towerBox");
+const dunBox=document.getElementById("dunBox");
+const dunBoxText=document.getElementById("dunBoxText");
+// 珠の効果一覧（妖怪退治モードのサイドパネル）
+{
+  const wrap=document.getElementById("orbLegend");
+  for(const k of ORB_KEYS){
+    const o=ORBS[k];
+    const row=document.createElement("div");
+    row.className="orbLegend";
+    row.innerHTML=`<span class="dot" style="background:radial-gradient(circle at 35% 35%, ${o.col}, ${o.col2})"></span>`+
+                  `<span><b>${o.emoji} ${o.name}</b> — ${o.desc}</span>`;
+    wrap.appendChild(row);
+  }
+}
 function syncHud(){
   if(S&&S.combo>=2&&S.phase==="play"){
     comboBox.style.display="block";
@@ -1779,6 +2129,10 @@ function syncHud(){
     towerBox.style.display="block";
     towerBox.querySelector(".t2").textContent=S.towerVisual.phase==="falling"?"🎉 倒れた！コインを回収しよう！":`コインをぶつけて押し倒そう！（傾き ${Math.round((S.towerVisual.lean||0)*100)}%）`;
   }else towerBox.style.display="none";
+  if(S&&S.mode==="dungeon"&&S.dun&&S.dun.bannerT>0){
+    dunBox.style.display="block";
+    dunBoxText.textContent=S.dun.banner;
+  }else dunBox.style.display="none";
 }
 
 /* ================= 入力 ================= */
@@ -1820,6 +2174,8 @@ function refreshTitleSaves(){
     const save=loadEndlessSave(diff);
     document.getElementById(id).textContent = save ? `🪙${(save.stock||0).toLocaleString()}` : "はじめから";
   }
+  const ds=loadDungeonSave();
+  document.getElementById("saveInfoDungeon").textContent = ds ? `⛩️ ${ds.checkpoint||1}階から再開（最深 ${ds.deepest||1}階）` : "1階からはじめる";
 }
 function startGame(mode,diff){
   ensureAC();
@@ -1833,10 +2189,12 @@ for(const [id,diff] of [["startEndlessEasyBtn","easy"],["startEndlessNormalBtn",
   document.getElementById(id).onclick=()=>startGame("endless",diff);
 }
 document.getElementById("startTrialBtn").onclick=()=>startGame("trial");
+document.getElementById("startDungeonBtn").onclick=()=>startGame("dungeon");
 // プレー画面からホーム（モード選択）へ戻る。エンドレスは進捗を保存してから戻る
 document.getElementById("homeBtn").onclick=()=>{
   if(!S) return;
   saveEndlessProgress();
+  saveDungeonProgress();
   // 進行中の演出・オーバーレイを全部閉じ、台の上を空にしてからタイトルへ
   S.kurun=null; S.slotAnim=null; S.ballRoulette=null; S.busy=false;
   S.eventQueue=[]; S.rainQueue=[];
@@ -1929,6 +2287,8 @@ window.__g={ get S(){return S}, update, tryDrop, render3D, pusherFront, newGame,
   triggerSlot, triggerJP, triggerBallRoulette, spawnMedalTower, spawnCoinRain, spawnTypedRain,
   pushEvent, processEventQueue, spawnBall,
   loadEndlessSave, writeEndlessSave, saveEndlessProgress, checkDailyBonus, todayStr, ENDLESS_SAVE_KEY,
+  loadDungeonSave, writeDungeonSave, saveDungeonProgress, DUNGEON_SAVE_KEY,
+  startFloor, spawnOrb, activateOrb, damageEnemy, damagePlayer, floorClear, dungeonDefeat, updateDungeon, ORBS, ORB_KEYS,
   get renderer(){return renderer}, get scene(){return scene}, get camera(){return camera},
   isMobile, THREE };
 </script>
