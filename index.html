@@ -430,6 +430,7 @@ function newGame(mode,difficulty){
     pendingDailyBonus:0, dun:null,
   };
   applyModeUI();
+  setSceneTheme(S.mode);
   if(S.mode==="endless"){
     let save=loadEndlessSave(S.difficulty);
     if(!save){
@@ -1424,7 +1425,7 @@ window.addEventListener("orientationchange",()=>setTimeout(resize,50));
 resize();
 
 /* --- ライティング --- */
-scene.add(new THREE.AmbientLight(0xffe0b8, 0.55));
+const ambient=new THREE.AmbientLight(0xffe0b8, 0.55); scene.add(ambient);
 const sun=new THREE.DirectionalLight(0xfff0d8, 1.6);
 sun.position.set(6, 22, 14);
 sun.castShadow=true;
@@ -1530,12 +1531,15 @@ const redMat=new THREE.MeshStandardMaterial({color:0xc0392b, roughness:0.7});
 const darkWoodMat=new THREE.MeshStandardMaterial({map:woodTex, roughness:0.85});
 const stripeMat=new THREE.MeshStandardMaterial({map:stripeTexV, roughness:0.85});
 
+const circusOnly=[];   // 妖怪退治モードで隠すサーカス装飾
+let tableMesh=null;    // テーマ切り替えで天面素材を差し替えるテーブル
 // テーブル本体
 {
   const tableMat=new THREE.MeshStandardMaterial({map:feltTex, roughness:0.9});
   const table=box(TABLE_W, 1.2, Z_FRONT-Z_BACK, tableMat);
   table.position.set(0, -0.6, (Z_FRONT+Z_BACK)/2);
   world.add(table);
+  tableMesh=table;
   // テーブル前面（木）
   const lip=box(TABLE_W+1.2, 2.0, 0.6, darkWoodMat);
   lip.position.set(0, -1.6, Z_FRONT+0.3);
@@ -1549,6 +1553,7 @@ for(const side of [-1,1]){
   const tent=box(0.6, 9, Z_FRONT-Z_BACK+2, stripeMat);
   tent.position.set(side*(TABLE_W/2+1.0), 5.5, (Z_FRONT+Z_BACK)/2);
   world.add(tent);
+  circusOnly.push(tent);
   // 手すりトップ
   const rail=box(1.1, 0.4, Z_FRONT-Z_BACK+2.4, redMat);
   rail.position.set(side*(TABLE_W/2+0.35), 1.9, (Z_FRONT+Z_BACK)/2);
@@ -1599,52 +1604,60 @@ function drawNormalBoard(c){
     c.fillText(S&&S.combo>=2?`Combo x${S.combo}`:"", 600, 240);
   }
 }
-// 妖怪退治モードの奥モニター：妖怪の姿と互いの体力、攻撃の予兆を表示する
+// 妖怪退治モードの奥モニター＝洞窟の戦闘ビュー。妖怪を大きく描き、探索深度と両者の体力を表示
 function drawDungeonBoard(c){
   const d=S.dun, e=d.enemy;
-  const g=c.createLinearGradient(0,0,0,280);
-  if(d.hurtT>0){ g.addColorStop(0,"#5a1414"); g.addColorStop(1,"#2a0808"); }
-  else{ g.addColorStop(0,"#221a34"); g.addColorStop(1,"#0d0a18"); }
+  // 洞窟の背景（被弾時は赤く点滅）
+  const g=c.createRadialGradient(320,90,20,320,140,420);
+  if(d.hurtT>0){ g.addColorStop(0,"#6a2412"); g.addColorStop(1,"#1a0602"); }
+  else{ g.addColorStop(0,"#3a2c1a"); g.addColorStop(0.6,"#1c1208"); g.addColorStop(1,"#0a0603"); }
   c.fillStyle=g; c.fillRect(0,0,640,280);
-  c.strokeStyle="#c08fff"; c.lineWidth=8; c.strokeRect(6,6,628,268);
-  c.textAlign="center";
-  // 階層表示
-  c.fillStyle="#d9c8ff"; c.font="bold 24px sans-serif";
-  c.fillText(`⛩️ 洞窟 ${d.floor}階${e&&e.boss?"（ボス）":""}`, 320, 40);
+  // 岩肌のざらつき
+  for(let i=0;i<70;i++){ const x=Math.random()*640,y=Math.random()*180,r=3+Math.random()*14;
+    c.fillStyle=`rgba(${60+Math.random()*40|0},${40+Math.random()*24|0},20,0.10)`;
+    c.beginPath(); c.arc(x,y,r,0,6.28); c.fill(); }
+  // 松明色の枠
+  c.strokeStyle="#e8912f"; c.lineWidth=8; c.strokeRect(6,6,628,268);
+  c.strokeStyle="#7a3a10"; c.lineWidth=2; c.strokeRect(12,12,616,256);
+  // 探索深度（記事風）
+  c.textAlign="left"; c.fillStyle="#ffd98a"; c.font="bold 22px serif";
+  c.fillText(`⛩️ 探索深度 ${d.floor}階`, 26, 40);
+  c.fillStyle="#c9a86a"; c.font="bold 12px serif";
+  c.fillText(`次の再開地点まで ${Math.max(0,DUN_CHECKPOINT_EVERY-((d.floor-1)%DUN_CHECKPOINT_EVERY))}階`, 26, 60);
+  c.textAlign="right"; c.fillStyle="#9a7a4a"; c.font="bold 12px serif";
+  c.fillText(`再開 ${d.checkpoint}階 ／ 最深 ${d.deepest}階`, 614, 40);
   if(e){
-    // 妖怪
-    const shake=e.windup>0.6?Math.sin(S.t*40)*4:0;
-    c.font="64px sans-serif";
-    c.fillText(e.emoji, 320+shake, 108);
-    c.fillStyle="#ffe9a8"; c.font="bold 22px sans-serif";
-    c.fillText(e.name, 320, 136);
+    // 大きな妖怪（攻撃予兆で揺れる）
+    const shake=e.windup>0.6?Math.sin(S.t*40)*5:0;
+    c.textAlign="center"; c.font="90px sans-serif";
+    c.fillText(e.emoji, 320+shake, 128);
+    c.fillStyle="#ffe0b0"; c.font="bold 20px serif";
+    c.fillText(`${e.name}${e.boss?" 〈ボス〉":""}`, 320, 158);
     // 敵HPバー
-    const bw=460, bx=(640-bw)/2;
-    c.fillStyle="#2a2038"; c.fillRect(bx,150,bw,20);
-    c.fillStyle="#ff5c5c"; c.fillRect(bx,150,bw*(e.hp/e.maxHp),20);
-    c.strokeStyle="#6b5a8a"; c.lineWidth=2; c.strokeRect(bx,150,bw,20);
-    c.fillStyle="#fff"; c.font="bold 14px sans-serif";
-    c.fillText(`${e.hp} / ${e.maxHp}`, 320, 165);
-    // 攻撃までのゲージ
-    c.fillStyle=e.windup>0?"#ff8a5c":"#9a8ab0"; c.font="bold 13px sans-serif";
-    c.fillText(e.windup>0?"⚡ 攻撃してくる！":`次の攻撃まで ${e.atkT.toFixed(1)}秒`, 320, 190);
+    const bw=520, bx=(640-bw)/2, by=170;
+    c.fillStyle="#140a04"; c.fillRect(bx,by,bw,20);
+    const eg=c.createLinearGradient(bx,0,bx+bw,0); eg.addColorStop(0,"#ff8a5c"); eg.addColorStop(1,"#b0182e");
+    c.fillStyle=eg; c.fillRect(bx,by,bw*(e.hp/e.maxHp),20);
+    c.strokeStyle="#7a3a10"; c.lineWidth=2; c.strokeRect(bx,by,bw,20);
+    c.fillStyle="#fff"; c.font="bold 13px serif"; c.fillText(`${e.hp} / ${e.maxHp}`, 320, by+15);
+    c.fillStyle=e.windup>0?"#ff9a4c":"#b89868"; c.font="bold 12px serif";
+    c.fillText(e.windup>0?"⚡ 妖怪の攻撃！守り珠でそなえろ":`次の攻撃まで ${e.atkT.toFixed(1)}秒`, 320, 204);
   }else{
-    c.fillStyle="#ffd94d"; c.font="bold 30px sans-serif";
-    c.fillText(d.defeatT>0?"💀 やられた…":"🎉 妖怪を撃破！", 320, 130);
+    c.textAlign="center"; c.fillStyle="#ffd94d"; c.font="bold 34px serif";
+    c.fillText(d.defeatT>0?"💀 やられた…":"🎉 妖怪を撃破！", 320, 150);
   }
-  // プレイヤーHP＋シールド
-  const pw=460, px=(640-pw)/2;
-  c.fillStyle="#2a2038"; c.fillRect(px,214,pw,22);
-  c.fillStyle="#7dffb0"; c.fillRect(px,214,pw*(d.hp/d.maxHp),22);
-  if(d.shield>0){
-    c.fillStyle="rgba(143,208,255,.75)";
-    c.fillRect(px,214,pw*Math.min(1,d.shield/d.maxHp),22);
-  }
-  c.strokeStyle="#6b5a8a"; c.lineWidth=2; c.strokeRect(px,214,pw,22);
-  c.fillStyle="#0d0a18"; c.font="bold 14px sans-serif";
-  c.fillText(`体力 ${d.hp} / ${d.maxHp}${d.shield>0?`  🛡️${d.shield}`:""}`, 320, 230);
-  c.fillStyle="#9a8ab0"; c.font="bold 12px sans-serif";
-  c.fillText(`⛩️ チェックポイント ${d.checkpoint}階 ／ 最深 ${d.deepest}階`, 320, 258);
+  // プレイヤー体力（♥赤）＋守り（🛡️青）を最下部に
+  const pw=520, px=(640-pw)/2, py=224;
+  c.fillStyle="#140a04"; c.fillRect(px,py,pw,18);
+  const pg=c.createLinearGradient(px,0,px+pw,0); pg.addColorStop(0,"#ff5c5c"); pg.addColorStop(1,"#8a1414");
+  c.fillStyle=pg; c.fillRect(px,py,pw*(d.hp/d.maxHp),18);
+  if(d.shield>0){ c.fillStyle="rgba(143,208,255,.8)"; c.fillRect(px,py,pw*Math.min(1,d.shield/d.maxHp),18); }
+  c.strokeStyle="#7a3a10"; c.lineWidth=2; c.strokeRect(px,py,pw,18);
+  c.textAlign="left"; c.fillStyle="#ffd0d0"; c.font="bold 13px serif";
+  c.fillText(`♥ ${d.hp}/${d.maxHp}`, px+6, py+14);
+  if(d.shield>0){ c.textAlign="right"; c.fillStyle="#dcecff"; c.fillText(`🛡️${d.shield}`, px+pw-6, py+14); }
+  c.textAlign="center"; c.fillStyle="#b89868"; c.font="bold 11px serif";
+  c.fillText("珠をスコアゾーンに落として妖怪を倒せ！", 320, 262);
 }
 function drawSlotOnBoard(c,sa){
   const g=c.createLinearGradient(0,0,0,280);
@@ -1671,6 +1684,7 @@ function drawSlotOnBoard(c,sa){
   const backTower=box(TABLE_W+4.5, 9, 1.2, stripeMat);
   backTower.position.set(0, 3.15, Z_BACK-1.6);   // モニター(y=3.3)に合わせて低めにし、画角上端で見切れないようにする
   world.add(backTower);
+  circusOnly.push(backTower);
   const sb=new THREE.Mesh(new THREE.PlaneGeometry(16.5, 7.2),
     new THREE.MeshBasicMaterial({map:sbTex}));
   // 傾けると上端が奥の木枠(中身の詰まった板)の中へ沈み込み、液晶上部が木で隠れてしまうため傾けず、枠より確実に手前へ置く
@@ -1685,6 +1699,112 @@ function drawSlotOnBoard(c,sa){
   const valance=box(TABLE_W+6, 2.2, 0.4, stripeMat);
   valance.position.set(0, 12.5, 4);
   world.add(valance);
+  circusOnly.push(valance);
+}
+
+/* ===== 妖怪退治モードの洞窟テーマ装飾（松明・大入提灯・岩壁・奥に立つ妖怪） ===== */
+// ごつごつした岩肌テクスチャ
+const rockTex=canvasTex(256,256,(c,w,h)=>{
+  c.fillStyle="#6a5334"; c.fillRect(0,0,w,h);
+  for(let i=0;i<180;i++){
+    const x=Math.random()*w,y=Math.random()*h,r=4+Math.random()*22;
+    const v=30+Math.random()*70|0;
+    c.fillStyle=`rgba(${v+20},${v},${v-12|0},${0.12+Math.random()*0.28})`;
+    c.beginPath(); c.arc(x,y,r,0,6.28); c.fill();
+  }
+  for(let i=0;i<22;i++){ c.strokeStyle="rgba(18,11,5,.45)"; c.lineWidth=1+Math.random()*2.2;
+    c.beginPath(); c.moveTo(Math.random()*w,0); c.bezierCurveTo(Math.random()*w,h/3,Math.random()*w,h*2/3,Math.random()*w,h); c.stroke(); }
+});
+rockTex.wrapS=rockTex.wrapT=THREE.RepeatWrapping; rockTex.repeat.set(2,2);
+const rockMat=new THREE.MeshStandardMaterial({map:rockTex, roughness:0.98});
+// 洞窟用の暗い土の床（テーブル天面差し替え用）
+const dunFeltTex=canvasTex(128,128,(c,w,h)=>{
+  c.fillStyle="#3a2a18"; c.fillRect(0,0,w,h);
+  for(let i=0;i<500;i++){ c.fillStyle=`rgba(${90+Math.random()*40|0},${60+Math.random()*30|0},30,${Math.random()*0.15})`; c.fillRect(Math.random()*w,Math.random()*h,2,2); }
+});
+dunFeltTex.wrapS=dunFeltTex.wrapT=THREE.RepeatWrapping; dunFeltTex.repeat.set(4,4);
+const dunFeltMat=new THREE.MeshStandardMaterial({map:dunFeltTex, roughness:0.95});
+// 大入提灯のテクスチャ（縦書き）
+function lanternTex(txt){
+  return canvasTex(96,128,(c,w,h)=>{
+    c.fillStyle="#e8912f"; c.fillRect(0,0,w,h);
+    // 上下の黒帯
+    c.fillStyle="#241206"; c.fillRect(0,0,w,10); c.fillRect(0,h-10,w,10);
+    // 竹ひごの横線
+    c.strokeStyle="rgba(120,60,20,.5)"; c.lineWidth=1.5;
+    for(let y=16;y<h-10;y+=11){ c.beginPath(); c.moveTo(0,y); c.lineTo(w,y); c.stroke(); }
+    c.fillStyle="#7a1010"; c.textAlign="center"; c.textBaseline="middle";
+    c.font="bold 40px serif";
+    c.fillText(txt[0],w/2,h*0.36);
+    c.fillText(txt[1],w/2,h*0.66);
+  });
+}
+const dungeonDecor=new THREE.Group(); dungeonDecor.visible=false; world.add(dungeonDecor);
+const torchFlames=[];   // 揺らめき更新用
+{
+  const midZ=(Z_FRONT+Z_BACK)/2;
+  // 左右の岩壁（サーカスの天蓋を隠す位置に立てる）
+  for(const side of [-1,1]){
+    const rock=box(2.2, 18, Z_FRONT-Z_BACK+8, rockMat);
+    rock.position.set(side*(TABLE_W/2+1.6), 6, midZ);
+    dungeonDecor.add(rock);
+  }
+  // 奥の岩壁
+  const backRock=box(TABLE_W+10, 20, 1.6, rockMat);
+  backRock.position.set(0, 6, Z_BACK-2.4);
+  dungeonDecor.add(backRock);
+  // 上部の岩（天井のせり出し）
+  const topRock=box(TABLE_W+10, 3, 8, rockMat);
+  topRock.position.set(0, 14.5, midZ+2);
+  dungeonDecor.add(topRock);
+  // 大入提灯を上部に一列（手前寄りに吊るして画面上部に収める）
+  const lTex=lanternTex("大入");
+  const lanternMat=new THREE.MeshStandardMaterial({map:lTex, emissive:0xff8a2a, emissiveIntensity:0.75, roughness:0.6});
+  const capMat=new THREE.MeshStandardMaterial({color:0x241206});
+  for(let i=0;i<5;i++){
+    const lx=-6+i*3;
+    const lantern=new THREE.Mesh(new THREE.CylinderGeometry(0.8,0.8,1.6,14), lanternMat);
+    lantern.position.set(lx, 9.6, 8.5);
+    dungeonDecor.add(lantern);
+    const cap=new THREE.Mesh(new THREE.CylinderGeometry(0.28,0.5,0.28,10), capMat);
+    cap.position.set(lx,10.5,8.5); dungeonDecor.add(cap);
+    const cord=new THREE.Mesh(new THREE.CylinderGeometry(0.03,0.03,2.4,6), capMat);
+    cord.position.set(lx,11.7,8.5); dungeonDecor.add(cord);
+  }
+  // 松明（奥の左右）：柱＋炎ビルボード＋ちらつくポイントライト
+  for(const side of [-1,1]){
+    const pole=new THREE.Mesh(new THREE.CylinderGeometry(0.14,0.18,4.2,8), new THREE.MeshStandardMaterial({color:0x2a1a0c, roughness:0.9}));
+    pole.position.set(side*7.5, 2, Z_BACK+2.2); dungeonDecor.add(pole);
+    const flame=new THREE.Mesh(new THREE.PlaneGeometry(1.8,2.6),
+      new THREE.MeshBasicMaterial({map:canvasTex(64,96,(c,w,h)=>{
+        const g=c.createRadialGradient(w/2,h*0.7,2,w/2,h*0.6,w*0.7);
+        g.addColorStop(0,"#fff2b0"); g.addColorStop(0.4,"#ffb040"); g.addColorStop(0.8,"#ff5810"); g.addColorStop(1,"rgba(255,60,0,0)");
+        c.fillStyle=g;
+        c.beginPath(); c.moveTo(w/2,0); c.quadraticCurveTo(w,h*0.5,w/2,h); c.quadraticCurveTo(0,h*0.5,w/2,0); c.fill();
+      }), transparent:true, depthWrite:false, blending:THREE.AdditiveBlending}));
+    flame.position.set(side*7.5, 4.6, Z_BACK+2.3); dungeonDecor.add(flame);
+    const tl=new THREE.PointLight(0xff8030, 26, 26); tl.position.set(side*7.5, 5, Z_BACK+3); dungeonDecor.add(tl);
+    torchFlames.push({flame, light:tl, base:26, phase:Math.random()*6.28});
+  }
+}
+// テーマ切り替え：洞窟(妖怪退治) ⇔ サーカス(その他)
+let curTheme=null;
+const CIRCUS_BG=new THREE.Color(0x2b1510), DUN_BG=new THREE.Color(0x0d0805);
+function setSceneTheme(mode){
+  const dun=(mode==="dungeon");
+  if(curTheme===(dun?"dun":"circus")) return;
+  curTheme=dun?"dun":"circus";
+  for(const m of circusOnly) m.visible=!dun;
+  dungeonDecor.visible=dun;
+  if(tableMesh){
+    if(!tableMesh.userData.feltMat) tableMesh.userData.feltMat=tableMesh.material;
+    tableMesh.material=dun?dunFeltMat:tableMesh.userData.feltMat;
+  }
+  scene.background=dun?DUN_BG:CIRCUS_BG;
+  scene.fog.color=dun?DUN_BG:CIRCUS_BG;
+  sun.intensity=dun?0.55:1.6;
+  ambient.intensity=dun?0.28:0.55;
+  warm1.intensity=warm2.intensity=dun?10:30;
 }
 // プッシャー（可動）
 const pusher=box(TABLE_W-0.06, PUSH_TOP, 14, new THREE.MeshStandardMaterial({color:0xe74c3c, roughness:0.55}));
@@ -2203,6 +2323,8 @@ document.getElementById("homeBtn").onclick=()=>{
   S.coins=[]; S.parts=[]; S.floats=[];
   render3D();               // 空になった台を反映
   S=null;
+  setSceneTheme("title");   // タイトルへ戻るときはサーカスの見た目に戻す
+  render3D();
   for(const id of ["jpOv","ballRouletteOv","shopOv","overOv"]) document.getElementById(id).style.display="none";
   document.getElementById("homeBtn").style.display="none";
   refreshTitleSaves();
@@ -2268,7 +2390,17 @@ function render3D(){
     syncTowerVisual();
     if(sbDirty||S.combo>=2){ drawScoreboard(); sbDirty=false; }
   }
+  if(dungeonDecor.visible) syncDungeonDecor();
   renderer.render(scene, camera);
+}
+// 洞窟テーマの演出更新：松明のちらつき
+function syncDungeonDecor(){
+  const t=performance.now()*0.001;
+  for(const tf of torchFlames){
+    const f=0.82+0.18*Math.sin(t*13+tf.phase)+0.06*Math.sin(t*27+tf.phase*2);
+    tf.light.intensity=tf.base*f;
+    tf.flame.scale.set(0.9+f*0.2, f, 1);
+  }
 }
 function loop(now){
   const dt=Math.min(1/30,(now-last)/1000);
