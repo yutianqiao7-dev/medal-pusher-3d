@@ -1522,6 +1522,30 @@ for(const k of ORB_KEYS){
     color:new THREE.Color(d.col), emissive:new THREE.Color(d.col2),
     emissiveIntensity:0.85, roughness:0.2, metalness:0.3});
 }
+// 古銭（妖怪退治モード用）：四角い穴の空いた銅銭。たぬきコインと差し替える
+function kosenFaceTex(){
+  return canvasTex(128,128,(c)=>{
+    // 銅の地
+    const g=c.createRadialGradient(64,58,8,64,64,64);
+    g.addColorStop(0,"#c79a4a"); g.addColorStop(0.55,"#a87e34"); g.addColorStop(1,"#6e4f1e");
+    c.fillStyle=g; c.beginPath(); c.arc(64,64,63,0,6.28); c.fill();
+    // 外周のふち
+    c.strokeStyle="#5a3f16"; c.lineWidth=6; c.beginPath(); c.arc(64,64,57,0,6.28); c.stroke();
+    c.strokeStyle="#e6c074"; c.lineWidth=2; c.beginPath(); c.arc(64,64,53,0,6.28); c.stroke();
+    // 四方の漢字（寛永通寳）
+    c.fillStyle="#3a2810"; c.font="bold 30px serif"; c.textAlign="center"; c.textBaseline="middle";
+    c.fillText("寛",64,26); c.fillText("永",64,102); c.fillText("通",100,64); c.fillText("寳",28,64);
+    // 中央の四角い穴
+    c.fillStyle="#2a1d0a"; c.fillRect(50,50,28,28);
+    c.strokeStyle="#7a5a26"; c.lineWidth=2; c.strokeRect(50,50,28,28);
+  });
+}
+const tanukiNormalMats=coinMats.normal;   // 通常時（サーカス）のたぬきコイン素材を保存
+const kosenNormalMats=(()=>{
+  const face=kosenFaceTex();
+  const side=()=>new THREE.MeshStandardMaterial({color:0x8a6528, roughness:0.5, metalness:0.5});
+  return [ side(), new THREE.MeshStandardMaterial({map:face, roughness:0.45, metalness:0.45}), side() ];
+})();
 
 /* --- 筐体の構築 --- */
 const world=new THREE.Group(); scene.add(world);
@@ -1805,6 +1829,9 @@ function setSceneTheme(mode){
   sun.intensity=dun?0.55:1.6;
   ambient.intensity=dun?0.28:0.55;
   warm1.intensity=warm2.intensity=dun?10:30;
+  // 通常コインの見た目を切り替え（洞窟＝古銭、それ以外＝たぬき）。
+  // コインは切替後のnewGameで生成されるので、次に作られるコインから反映される
+  coinMats.normal=dun?kosenNormalMats:tanukiNormalMats;
 }
 // プッシャー（可動）
 const pusher=box(TABLE_W-0.06, PUSH_TOP, 14, new THREE.MeshStandardMaterial({color:0xe74c3c, roughness:0.55}));
